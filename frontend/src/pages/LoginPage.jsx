@@ -84,7 +84,7 @@ export default function LoginPage() {
               </button>
             </form>
           </div>
-          <p className="text-center text-xs mt-6" style={{ color: '#94a3b8' }}>© 2026 SYGALIN SAS</p>
+          <p className="text-center text-xs mt-6" style={{ color: '#94a3b8' }}>© 2027 SYGALIN SAS</p>
         </div>
       </div>
     </div>
