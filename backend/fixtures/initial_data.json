@@ -1,0 +1,97 @@
+[
+  {
+    "model": "entreprise.entreprise",
+    "pk": "11111111-1111-1111-1111-111111111111",
+    "fields": { "nom": "SYGALIN SAS", "adresse": "Ngaoundere, Cameroun", "logo": "" }
+  },
+  {
+    "model": "entreprise.departement",
+    "pk": "22222222-2222-2222-2222-222222222201",
+    "fields": { "entreprise": "11111111-1111-1111-1111-111111111111", "nom": "Direction Generale", "code": "DG" }
+  },
+  {
+    "model": "entreprise.departement",
+    "pk": "22222222-2222-2222-2222-222222222202",
+    "fields": { "entreprise": "11111111-1111-1111-1111-111111111111", "nom": "Comptabilite Finance", "code": "COMPTA" }
+  },
+  {
+    "model": "entreprise.departement",
+    "pk": "22222222-2222-2222-2222-222222222203",
+    "fields": { "entreprise": "11111111-1111-1111-1111-111111111111", "nom": "Ressources Humaines", "code": "RH" }
+  },
+  {
+    "model": "entreprise.departement",
+    "pk": "22222222-2222-2222-2222-222222222204",
+    "fields": { "entreprise": "11111111-1111-1111-1111-111111111111", "nom": "Informatique", "code": "IT" }
+  },
+  {
+    "model": "entreprise.service",
+    "pk": "33333333-3333-3333-3333-333333333301",
+    "fields": { "departement": "22222222-2222-2222-2222-222222222202", "nom": "Facturation", "code": "FACT" }
+  },
+  {
+    "model": "entreprise.service",
+    "pk": "33333333-3333-3333-3333-333333333302",
+    "fields": { "departement": "22222222-2222-2222-2222-222222222202", "nom": "Tresorerie", "code": "TRES" }
+  },
+  {
+    "model": "entreprise.service",
+    "pk": "33333333-3333-3333-3333-333333333303",
+    "fields": { "departement": "22222222-2222-2222-2222-222222222203", "nom": "Recrutement", "code": "RECR" }
+  },
+  {
+    "model": "entreprise.service",
+    "pk": "33333333-3333-3333-3333-333333333304",
+    "fields": { "departement": "22222222-2222-2222-2222-222222222204", "nom": "Developpement", "code": "DEV" }
+  },
+  {
+    "model": "armoires.armoire",
+    "pk": "44444444-4444-4444-4444-444444444401",
+    "fields": { "nom": "Armoire Comptabilite", "code": "ARM-COMPTA", "description": "Documents comptables", "date_creation": "2025-01-01T00:00:00Z" }
+  },
+  {
+    "model": "armoires.armoire",
+    "pk": "44444444-4444-4444-4444-444444444402",
+    "fields": { "nom": "Armoire Ressources Humaines", "code": "ARM-RH", "description": "Dossiers personnel", "date_creation": "2025-01-01T00:00:00Z" }
+  },
+  {
+    "model": "armoires.armoire",
+    "pk": "44444444-4444-4444-4444-444444444403",
+    "fields": { "nom": "Armoire Direction", "code": "ARM-DG", "description": "Documents direction generale", "date_creation": "2025-01-01T00:00:00Z" }
+  },
+  {
+    "model": "armoires.armoire",
+    "pk": "44444444-4444-4444-4444-444444444404",
+    "fields": { "nom": "Armoire Informatique", "code": "ARM-IT", "description": "Documentation technique", "date_creation": "2025-01-01T00:00:00Z" }
+  },
+  {
+    "model": "armoires.rayon",
+    "pk": "55555555-5555-5555-5555-555555555501",
+    "fields": { "armoire": "44444444-4444-4444-4444-444444444401", "nom": "Factures 2024", "code": "R-FACT-2024", "position": "Haut", "date_creation": "2025-01-01T00:00:00Z" }
+  },
+  {
+    "model": "armoires.rayon",
+    "pk": "55555555-5555-5555-5555-555555555502",
+    "fields": { "armoire": "44444444-4444-4444-4444-444444444401", "nom": "Factures 2025", "code": "R-FACT-2025", "position": "Bas", "date_creation": "2025-01-01T00:00:00Z" }
+  },
+  {
+    "model": "armoires.rayon",
+    "pk": "55555555-5555-5555-5555-555555555503",
+    "fields": { "armoire": "44444444-4444-4444-4444-444444444402", "nom": "Contrats travail", "code": "R-CTR-TRAV", "position": "Haut", "date_creation": "2025-01-01T00:00:00Z" }
+  },
+  {
+    "model": "armoires.rayon",
+    "pk": "55555555-5555-5555-5555-555555555504",
+    "fields": { "armoire": "44444444-4444-4444-4444-444444444402", "nom": "Fiches de paie", "code": "R-PAIE", "position": "Bas", "date_creation": "2025-01-01T00:00:00Z" }
+  },
+  {
+    "model": "armoires.rayon",
+    "pk": "55555555-5555-5555-5555-555555555505",
+    "fields": { "armoire": "44444444-4444-4444-4444-444444444403", "nom": "Proces-verbaux", "code": "R-PV", "position": "Haut", "date_creation": "2025-01-01T00:00:00Z" }
+  },
+  {
+    "model": "armoires.rayon",
+    "pk": "55555555-5555-5555-5555-555555555506",
+    "fields": { "armoire": "44444444-4444-4444-4444-444444444404", "nom": "Licences logicielles", "code": "R-LIC", "position": "Haut", "date_creation": "2025-01-01T00:00:00Z" }
+  }
+]
