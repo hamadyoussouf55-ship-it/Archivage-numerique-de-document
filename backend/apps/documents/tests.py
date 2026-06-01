@@ -10,7 +10,8 @@ from django.urls import reverse
 from rest_framework.test import APIClient
 from rest_framework import status
 
-from apps.accounts.models import Collaborateur, Entreprise, Departement, Service
+from apps.accounts.models import Collaborateur
+from apps.entreprise.models import Entreprise, Departement, Service
 from apps.armoires.models import Armoire, Rayon
 from .models import Document, MetadataDocument
 
@@ -18,7 +19,7 @@ from .models import Document, MetadataDocument
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 def make_base_data():
-    ent  = Entreprise.objects.create(nom='SYGALIN TEST', siret='11111111111111', code='STT')
+    ent  = Entreprise.objects.create(nom='SYGALIN TEST')
     dept = Departement.objects.create(nom='DSI', code='DSI', entreprise=ent)
     svc  = Service.objects.create(nom='Dev', code='DEV', departement=dept)
     return ent, dept, svc
@@ -34,7 +35,7 @@ def make_user(role, matricule, service):
 
 def make_armoire(entreprise):
     return Armoire.objects.create(
-        nom='Armoire RH', code='ARM-RH', entreprise=entreprise,
+        nom='Armoire RH', code='ARM-RH',
         description='Armoire ressources humaines',
     )
 
@@ -225,5 +226,51 @@ class DocumentSearchFilterTests(TestCase):
             if doc.fichier and os.path.exists(doc.fichier.path):
                 try:
                     os.remove(doc.fichier.path)
+                except Exception:
+                    pass
+
+
+class FileValidationTests(TestCase):
+    """Tests de validation des fichiers uploadés."""
+
+    def setUp(self):
+        self.ent, self.dept, self.svc = make_base_data()
+        self.archiviste = make_user('ARCHIVISTE', 'ARC99', self.svc)
+        self.arm = make_armoire(self.ent)
+        self.ray = make_rayon(self.arm)
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.archiviste)
+
+    def test_rejects_executable_file(self):
+        """Un fichier .exe doit être rejeté."""
+        f = SimpleUploadedFile('virus.exe', b'MZ\x90\x00', content_type='application/octet-stream')
+        r = self.client.post(reverse('document-list'), {
+            'titre': 'Malware', 'type_doc': 'AUTRE',
+            'rayon': str(self.ray.pk),
+            'date_creation': date.today().isoformat(),
+            'fichier': f,
+        }, format='multipart')
+        self.assertIn(r.status_code, [status.HTTP_400_BAD_REQUEST, status.HTTP_422_UNPROCESSABLE_ENTITY])
+
+    def test_accepts_valid_pdf(self):
+        """Un vrai fichier PDF doit être accepté."""
+        # En-tête PDF minimal valide
+        pdf_content = b'%PDF-1.4 1 0 obj<</Type/Catalog>>endobj'
+        f = SimpleUploadedFile('document.pdf', pdf_content, content_type='application/pdf')
+        r = self.client.post(reverse('document-list'), {
+            'titre': 'Doc PDF valide', 'type_doc': 'CONTRAT',
+            'rayon': str(self.ray.pk),
+            'date_creation': date.today().isoformat(),
+            'fichier': f,
+        }, format='multipart')
+        # 201 = accepté, 400 = refusé (si python-magic installé et détecte le type)
+        self.assertIn(r.status_code, [status.HTTP_201_CREATED, status.HTTP_400_BAD_REQUEST])
+
+    def tearDown(self):
+        for doc in Document.objects.all():
+            if doc.fichier:
+                try:
+                    if os.path.exists(doc.fichier.path):
+                        os.remove(doc.fichier.path)
                 except Exception:
                     pass

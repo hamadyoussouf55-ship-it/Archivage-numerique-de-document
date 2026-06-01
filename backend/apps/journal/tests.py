@@ -6,12 +6,13 @@ from django.urls import reverse
 from rest_framework.test import APIClient
 from rest_framework import status
 
-from apps.accounts.models import Collaborateur, Entreprise, Departement, Service
+from apps.accounts.models import Collaborateur
+from apps.entreprise.models import Entreprise, Departement, Service
 from .models import JournalAction
 
 
 def make_base():
-    ent   = Entreprise.objects.create(nom='LOG SAS', siret='77777777777777', code='LOG')
+    ent   = Entreprise.objects.create(nom='LOG SAS')
     dept  = Departement.objects.create(nom='DSI', code='DSI', entreprise=ent)
     svc   = Service.objects.create(nom='Dev', code='DEV', departement=dept)
     admin = Collaborateur.objects.create_user(

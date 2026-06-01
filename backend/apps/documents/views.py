@@ -6,18 +6,22 @@ from rest_framework import generics, status, permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 from rest_framework.filters import SearchFilter
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Count, Q
 
-from .models import Document, MetadataDocument
+from .models import Document, MetadataDocument, DocumentVersion, DocumentShare
 from .serializers import (
     DocumentSerializer, DocumentCreateSerializer,
     DocumentListSerializer, MetadataDocumentSerializer,
+    DocumentVersionSerializer, DocumentShareSerializer,
 )
 from apps.accounts.permissions import IsAdminOrArchiviste, CanAccessDocument
 from apps.armoires.models import Rayon
 from apps.journal.utils import enregistrer_action
+from .utils import indexer_document_texte
 
 
 class DocumentListCreateView(generics.ListCreateAPIView):
@@ -25,7 +29,8 @@ class DocumentListCreateView(generics.ListCreateAPIView):
     filter_backends = [DjangoFilterBackend, SearchFilter]
     filterset_fields = ['statut', 'type_doc', 'rayon', 'rayon__armoire']
     search_fields   = ['titre', 'code_unique', 'type_doc',
-                        'metadata__auteur', 'metadata__destinataire', 'metadata__description']
+                        'metadata__auteur', 'metadata__destinataire', 'metadata__description',
+                        'metadata__texte_extrait']
 
     def get_queryset(self):
         user = self.request.user
@@ -45,6 +50,8 @@ class DocumentListCreateView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         doc = serializer.save()
+        # Indexation texte intégral à la volée
+        indexer_document_texte(doc)
         enregistrer_action(
             auteur=self.request.user, type_action='CREATION', document=doc,
             details=f"Document cree : {doc.code_unique}",
@@ -64,7 +71,11 @@ class DocumentDetailView(generics.RetrieveUpdateDestroyAPIView):
         return DocumentCreateSerializer if self.request.method in ('PUT', 'PATCH') else DocumentSerializer
 
     def perform_update(self, serializer):
+        ancien_fichier = self.get_object().fichier
         doc = serializer.save()
+        # Si le fichier a ete remplace/modifie, on re-extrait le texte
+        if doc.fichier != ancien_fichier:
+            indexer_document_texte(doc)
         enregistrer_action(
             auteur=self.request.user, type_action='MODIFICATION', document=doc,
             details=f"Document modifie : {doc.code_unique}",
@@ -195,6 +206,11 @@ class MetadataUpdateView(generics.RetrieveUpdateAPIView):
         return meta
 
 
+@swagger_auto_schema(
+    operation_summary="Statistiques globales du tableau de bord",
+    operation_description="Retourne le nombre total de documents, armoires, rayons et une répartition par type et armoire.",
+    tags=["Statistiques"],
+)
 class DashboardStatsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -281,3 +297,355 @@ class DocumentExportPDFView(APIView):
             ip=request.META.get('REMOTE_ADDR', ''),
         )
         return export_documents_pdf(qs)
+
+
+from django.contrib.auth.hashers import make_password, check_password
+from django.db import transaction
+
+# ── Corbeille Views ────────────────────────────────────────────────────────────
+
+class DocumentCorbeilleListView(generics.ListAPIView):
+    """Liste des documents supprimes logiquement (corbeille)."""
+    permission_classes = [IsAdminOrArchiviste]
+    serializer_class = DocumentListSerializer
+
+    def get_queryset(self):
+        return Document.objects.select_related('rayon', 'rayon__armoire', 'createur').filter(statut='SUPPRIME')
+
+
+class DocumentRestaurerView(APIView):
+    """Restaure un document supprime."""
+    permission_classes = [IsAdminOrArchiviste]
+
+    def post(self, request, pk):
+        try:
+            doc = Document.objects.get(pk=pk)
+        except Document.DoesNotExist:
+            return Response({"detail": "Document introuvable."}, status=404)
+
+        if doc.statut != 'SUPPRIME':
+            return Response({"detail": "Le document n'est pas supprime."}, status=400)
+
+        doc.statut = 'ACTIF'
+        doc.save()
+
+        enregistrer_action(
+            auteur=request.user, type_action='MODIFICATION', document=doc,
+            details=f"Restauration du document depuis la corbeille",
+            ip=request.META.get('REMOTE_ADDR', ''),
+        )
+        return Response({"detail": "Document restaure avec succes."})
+
+
+class DocumentPurgerView(APIView):
+    """Supprime definitivement un document de la base de donnees et du disque."""
+    permission_classes = [IsAdminOrArchiviste]
+
+    def delete(self, request, pk):
+        try:
+            doc = Document.objects.get(pk=pk)
+        except Document.DoesNotExist:
+            return Response({"detail": "Document introuvable."}, status=404)
+
+        if doc.statut != 'SUPPRIME':
+            return Response({"detail": "Le document doit etre dans la corbeille pour etre purge."}, status=400)
+
+        file_path = os.path.join(settings.MEDIA_ROOT, str(doc.fichier))
+        nom_fichier = doc.nom_fichier or str(doc.fichier)
+        code_unique = doc.code_unique
+
+        # Supprimer le fichier sur le disque s'il existe
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except Exception as e:
+                # Continuer meme si erreur fichier (fichier absent par exemple)
+                pass
+
+        doc.delete()
+
+        enregistrer_action(
+            auteur=request.user, type_action='SUPPRESSION', document=None,
+            details=f"Purge definitive du document {code_unique} ({nom_fichier})",
+            ip=request.META.get('REMOTE_ADDR', ''),
+        )
+        return Response({"detail": "Document purge definitivement."})
+
+
+# ── Versioning Views ───────────────────────────────────────────────────────────
+
+class DocumentVersionListView(generics.ListAPIView):
+    """Liste de toutes les versions d'un document."""
+    permission_classes = [CanAccessDocument]
+    serializer_class = DocumentVersionSerializer
+
+    def get_queryset(self):
+        doc_id = self.kwargs['pk']
+        # Verifier l'existence et les permissions
+        try:
+            doc = Document.objects.get(id=doc_id)
+        except Document.DoesNotExist:
+            raise Http404("Document introuvable.")
+        self.check_object_permissions(self.request, doc)
+        return DocumentVersion.objects.filter(document_id=doc_id).select_related('createur')
+
+
+class DocumentVersionUploadView(APIView):
+    """Televerser une nouvelle version pour un document."""
+    permission_classes = [IsAdminOrArchiviste]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def post(self, request, pk):
+        try:
+            doc = Document.objects.get(pk=pk)
+        except Document.DoesNotExist:
+            return Response({"detail": "Document introuvable."}, status=404)
+
+        if doc.statut == 'SUPPRIME':
+            return Response({"detail": "Impossible d'ajouter une version a un document supprime."}, status=400)
+
+        fichier = request.FILES.get('fichier')
+        if not fichier:
+            return Response({"detail": "Fichier requis."}, status=400)
+
+        # Valider le fichier avec le validateur
+        from .validators import validate_document_file
+        try:
+            validate_document_file(fichier)
+        except Exception as e:
+            return Response({"detail": str(e)}, status=400)
+
+        with transaction.atomic():
+            # Determiner le numero de la nouvelle version
+            derniere_version = DocumentVersion.objects.filter(document=doc).order_by('-numero_version').first()
+            nouveau_numero = (derniere_version.numero_version + 1) if derniere_version else 1
+
+            # Mettre a jour le document principal
+            doc.fichier = fichier
+            doc.nom_fichier = fichier.name.split('/')[-1]
+            doc.taille = fichier.size
+            doc.save()
+
+            # Creer la nouvelle version
+            version = DocumentVersion.objects.create(
+                document=doc,
+                numero_version=nouveau_numero,
+                fichier=fichier,
+                nom_fichier=doc.nom_fichier,
+                taille=doc.taille,
+                createur=request.user
+            )
+
+        # Mettre a jour l'indexation de texte
+        indexer_document_texte(doc)
+
+        enregistrer_action(
+            auteur=request.user, type_action='MODIFICATION', document=doc,
+            details=f"Nouvelle version creee : v{nouveau_numero}",
+            ip=request.META.get('REMOTE_ADDR', ''),
+        )
+
+        return Response(DocumentVersionSerializer(version).data, status=status.HTTP_201_CREATED)
+
+
+class DocumentVersionDownloadView(APIView):
+    """Telechargement securise d'une version historique specifique."""
+    permission_classes = [CanAccessDocument]
+
+    def get(self, request, version_pk):
+        try:
+            version = DocumentVersion.objects.select_related('document').get(pk=version_pk)
+        except DocumentVersion.DoesNotExist:
+            raise Http404("Version introuvable.")
+
+        # Verifier permissions sur le document parent
+        self.check_object_permissions(request, version.document)
+
+        if version.document.statut == 'SUPPRIME':
+            return Response({"detail": "Document supprime."}, status=404)
+
+        file_path = os.path.join(settings.MEDIA_ROOT, str(version.fichier))
+        if not os.path.exists(file_path):
+            return Response({"detail": "Fichier introuvable sur le serveur."}, status=404)
+
+        enregistrer_action(
+            auteur=request.user, type_action='TELECHARGEMENT', document=version.document,
+            details=f"Telechargement de la version v{version.numero_version} : {version.nom_fichier}",
+            ip=request.META.get('REMOTE_ADDR', ''),
+        )
+
+        content_type, _ = mimetypes.guess_type(file_path)
+        content_type = content_type or 'application/octet-stream'
+
+        response = FileResponse(
+            open(file_path, 'rb'),
+            content_type=content_type,
+            as_attachment=True,
+            filename=version.nom_fichier or os.path.basename(file_path),
+        )
+        return response
+
+
+class DocumentVersionRestoreView(APIView):
+    """Restaure une version historique specifique en tant que version courante."""
+    permission_classes = [IsAdminOrArchiviste]
+
+    def post(self, request, version_pk):
+        try:
+            version_a_restaurer = DocumentVersion.objects.select_related('document').get(pk=version_pk)
+        except DocumentVersion.DoesNotExist:
+            return Response({"detail": "Version introuvable."}, status=404)
+
+        doc = version_a_restaurer.document
+        if doc.statut == 'SUPPRIME':
+            return Response({"detail": "Impossible de restaurer une version sur un document supprime."}, status=400)
+
+        with transaction.atomic():
+            # Determiner le numero de la version suivante
+            derniere_version = DocumentVersion.objects.filter(document=doc).order_by('-numero_version').first()
+            nouveau_numero = (derniere_version.numero_version + 1) if derniere_version else 1
+
+            # Copier le fichier de la version a restaurer vers le document principal
+            doc.fichier = version_a_restaurer.fichier
+            doc.nom_fichier = version_a_restaurer.nom_fichier
+            doc.taille = version_a_restaurer.taille
+            doc.save()
+
+            # Creer une nouvelle version N+1 qui a le meme contenu
+            nouvelle_version = DocumentVersion.objects.create(
+                document=doc,
+                numero_version=nouveau_numero,
+                fichier=version_a_restaurer.fichier,
+                nom_fichier=version_a_restaurer.nom_fichier,
+                taille=version_a_restaurer.taille,
+                createur=request.user
+            )
+
+        # Mettre a jour l'indexation de texte
+        indexer_document_texte(doc)
+
+        enregistrer_action(
+            auteur=request.user, type_action='MODIFICATION', document=doc,
+            details=f"Restauration de la version v{version_a_restaurer.numero_version} en v{nouveau_numero}",
+            ip=request.META.get('REMOTE_ADDR', ''),
+        )
+
+        return Response(DocumentSerializer(doc).data)
+
+
+# ── Sharing Views ──────────────────────────────────────────────────────────────
+
+class DocumentShareCreateView(generics.CreateAPIView):
+    """Generer un lien de partage externe pour un document."""
+    permission_classes = [IsAdminOrArchiviste]
+    serializer_class = DocumentShareSerializer
+
+    def perform_create(self, serializer):
+        doc_id = self.kwargs['pk']
+        try:
+            doc = Document.objects.get(id=doc_id)
+        except Document.DoesNotExist:
+            raise Http404("Document introuvable.")
+
+        # Hasher le mot de passe s'il est fourni
+        cle_securite = self.request.data.get('cle_securite')
+        hash_cle = make_password(cle_securite) if cle_securite else None
+
+        share = serializer.save(
+            document=doc,
+            cle_securite=hash_cle,
+            cree_par=self.request.user
+        )
+
+        enregistrer_action(
+            auteur=self.request.user, type_action='MODIFICATION', document=doc,
+            details=f"Creation d'un lien de partage externe (id: {share.id})",
+            ip=self.request.META.get('REMOTE_ADDR', ''),
+        )
+
+
+class DocumentSharePublicDetailView(APIView):
+    """Consulter les details d'un partage de maniere publique."""
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, share_uuid):
+        try:
+            share = DocumentShare.objects.select_related('document').get(pk=share_uuid)
+        except (DocumentShare.DoesNotExist, ValueError):
+            return Response({"detail": "Lien de partage invalide ou expire."}, status=404)
+
+        # Verifier expiration temporelle
+        from django.utils import timezone
+        if share.date_expiration and share.date_expiration < timezone.now():
+            return Response({"detail": "Lien de partage expire."}, status=404)
+
+        # Verifier nombre de telechargements max
+        if share.telechargements_max is not None and share.nombre_telechargements >= share.telechargements_max:
+            return Response({"detail": "Lien de partage expire (nombre maximum de telechargements atteint)."}, status=404)
+
+        if share.document.statut == 'SUPPRIME':
+            return Response({"detail": "Document indisponible."}, status=404)
+
+        return Response({
+            "id": share.id,
+            "document_titre": share.document.titre,
+            "requires_password": share.cle_securite is not None,
+            "date_expiration": share.date_expiration,
+            "taille": share.document.taille_lisible,
+            "nom_fichier": share.document.nom_fichier
+        })
+
+
+class DocumentSharePublicDownloadView(APIView):
+    """Telechargement d'un fichier via partage public."""
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request, share_uuid):
+        try:
+            share = DocumentShare.objects.select_related('document').get(pk=share_uuid)
+        except (DocumentShare.DoesNotExist, ValueError):
+            return Response({"detail": "Lien de partage invalide."}, status=404)
+
+        # Verifications d'expiration
+        from django.utils import timezone
+        if share.date_expiration and share.date_expiration < timezone.now():
+            return Response({"detail": "Lien de partage expire."}, status=404)
+
+        if share.telechargements_max is not None and share.nombre_telechargements >= share.telechargements_max:
+            return Response({"detail": "Lien de partage expire (limite atteinte)."}, status=404)
+
+        if share.document.statut == 'SUPPRIME':
+            return Response({"detail": "Document indisponible."}, status=404)
+
+        # Verifier mot de passe si requis
+        if share.cle_securite:
+            mot_de_passe = request.data.get('mot_de_passe')
+            if not mot_de_passe or not check_password(mot_de_passe, share.cle_securite):
+                return Response({"detail": "Mot de passe incorrect ou manquant."}, status=401)
+
+        file_path = os.path.join(settings.MEDIA_ROOT, str(share.document.fichier))
+        if not os.path.exists(file_path):
+            return Response({"detail": "Fichier physique introuvable sur le serveur."}, status=404)
+
+        # Incrementer le compteur de telechargement de maniere atomique
+        with transaction.atomic():
+            share_locked = DocumentShare.objects.select_for_update().get(id=share.id)
+            share_locked.nombre_telechargements += 1
+            share_locked.save()
+
+        # Enregistrer dans les logs d'audit (sans auteur puisqu'il s'agit d'un acces externe anonyme)
+        enregistrer_action(
+            auteur=None, type_action='TELECHARGEMENT', document=share.document,
+            details=f"Telechargement externe via partage (Partage ID: {share.id})",
+            ip=request.META.get('REMOTE_ADDR', ''),
+        )
+
+        content_type, _ = mimetypes.guess_type(file_path)
+        content_type = content_type or 'application/octet-stream'
+
+        return FileResponse(
+            open(file_path, 'rb'),
+            content_type=content_type,
+            as_attachment=True,
+            filename=share.document.nom_fichier
+        )

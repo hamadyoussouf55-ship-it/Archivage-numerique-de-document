@@ -5,7 +5,7 @@ from .models import Document, MetadataDocument
 class MetadataDocumentSerializer(serializers.ModelSerializer):
     class Meta:
         model  = MetadataDocument
-        fields = ['id', 'auteur', 'date_emission', 'mots_cles', 'destinataire', 'description']
+        fields = ['id', 'auteur', 'date_emission', 'mots_cles', 'destinataire', 'description', 'texte_extrait']
 
 
 class DocumentListSerializer(serializers.ModelSerializer):
@@ -73,3 +73,25 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
                 setattr(meta, attr, value)
             meta.save()
         return instance
+
+
+from .models import DocumentVersion, DocumentShare
+
+class DocumentVersionSerializer(serializers.ModelSerializer):
+    createur_nom = serializers.CharField(source='createur.full_name', read_only=True)
+    class Meta:
+        model = DocumentVersion
+        fields = ['id', 'numero_version', 'nom_fichier', 'taille', 'date_creation', 'createur_nom', 'fichier']
+        read_only_fields = ['id', 'numero_version', 'nom_fichier', 'taille', 'date_creation', 'createur_nom']
+
+
+class DocumentShareSerializer(serializers.ModelSerializer):
+    document_titre = serializers.CharField(source='document.titre', read_only=True)
+    cree_par_nom = serializers.CharField(source='cree_par.full_name', read_only=True)
+    class Meta:
+        model = DocumentShare
+        fields = ['id', 'cle_securite', 'date_expiration', 'nombre_telechargements', 'telechargements_max', 'cree_par_nom', 'date_creation', 'document_titre']
+        read_only_fields = ['id', 'nombre_telechargements', 'cree_par_nom', 'date_creation']
+        extra_kwargs = {
+            'cle_securite': {'write_only': True}
+        }

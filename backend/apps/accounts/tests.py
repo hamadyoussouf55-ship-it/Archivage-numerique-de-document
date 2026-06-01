@@ -5,12 +5,13 @@ from django.test import TestCase
 from django.urls import reverse
 from rest_framework.test import APIClient
 from rest_framework import status
-from .models import Collaborateur, Entreprise, Departement, Service
+from .models import Collaborateur
+from apps.entreprise.models import Entreprise, Departement, Service
 
 
 def make_entreprise():
     return Entreprise.objects.create(
-        nom='SYGALIN SAS TEST', siret='12345678901234', code='SGT'
+        nom='SYGALIN SAS TEST'
     )
 
 

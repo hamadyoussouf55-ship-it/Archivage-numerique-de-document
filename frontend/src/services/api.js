@@ -5,30 +5,78 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
+// ── Intercepteur requête : injecte le token ──────────────────────────────────
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token')
   if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
 
+// ── Intercepteur réponse : refresh automatique ───────────────────────────────
+let isRefreshing  = false
+let failedQueue   = []   // requêtes en attente pendant le refresh
+
+function processQueue(error, token = null) {
+  failedQueue.forEach(({ resolve, reject }) => {
+    if (error) reject(error)
+    else resolve(token)
+  })
+  failedQueue = []
+}
+
 api.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error.config
-    if (error.response?.status === 401 && !original._retry) {
-      original._retry = true
-      try {
-        const refresh = localStorage.getItem('refresh_token')
-        const { data } = await axios.post('/api/auth/token/refresh/', { refresh })
-        localStorage.setItem('access_token', data.access)
-        original.headers.Authorization = `Bearer ${data.access}`
-        return api(original)
-      } catch {
-        localStorage.clear()
-        window.location.href = '/login'
-      }
+
+    // Ignore les erreurs non-401 ou les retries déjà faits
+    if (error.response?.status !== 401 || original._retry) {
+      return Promise.reject(error)
     }
-    return Promise.reject(error)
+
+    // Évite de refresh en boucle sur l'endpoint de refresh lui-même
+    if (original.url?.includes('/token/refresh/') || original.url?.includes('/auth/login/')) {
+      localStorage.clear()
+      window.location.href = '/login'
+      return Promise.reject(error)
+    }
+
+    if (isRefreshing) {
+      // Si un refresh est déjà en cours, mettre la requête en file d'attente
+      return new Promise((resolve, reject) => {
+        failedQueue.push({ resolve, reject })
+      }).then((token) => {
+        original.headers.Authorization = `Bearer ${token}`
+        return api(original)
+      }).catch((err) => Promise.reject(err))
+    }
+
+    original._retry  = true
+    isRefreshing     = true
+
+    try {
+      const refresh = localStorage.getItem('refresh_token')
+      if (!refresh) throw new Error('No refresh token')
+
+      const { data } = await axios.post('/api/auth/token/refresh/', { refresh })
+      const newToken  = data.access
+
+      localStorage.setItem('access_token', newToken)
+      api.defaults.headers.common.Authorization = `Bearer ${newToken}`
+      original.headers.Authorization            = `Bearer ${newToken}`
+
+      processQueue(null, newToken)
+      return api(original)
+    } catch (refreshError) {
+      processQueue(refreshError, null)
+      localStorage.clear()
+      // Notification douce avant redirect
+      window.dispatchEvent(new CustomEvent('auth:expired'))
+      setTimeout(() => { window.location.href = '/login' }, 1500)
+      return Promise.reject(refreshError)
+    } finally {
+      isRefreshing = false
+    }
   }
 )
 
@@ -48,132 +96,124 @@ export const authAPI = {
 export const entrepriseAPI = {
   getDepartements:     (params)    => api.get('/entreprise/departements/', { params }),
   createDepartement:   (data)      => api.post('/entreprise/departements/', data),
-  updateDepartement:   (id, data)  => api.patch(`/entreprise/departements/${id}/`, data),
-  deleteDepartement:   (id)        => api.delete(`/entreprise/departements/${id}/`),
   getServices:         (params)    => api.get('/entreprise/services/', { params }),
   createService:       (data)      => api.post('/entreprise/services/', data),
-  updateService:       (id, data)  => api.patch(`/entreprise/services/${id}/`, data),
-  deleteService:       (id)        => api.delete(`/entreprise/services/${id}/`),
-  getRoles:            (params)    => api.get('/entreprise/roles/', { params }),
-  createRole:          (data)      => api.post('/entreprise/roles/', data),
-  deleteRole:          (id)        => api.delete(`/entreprise/roles/${id}/`),
 }
 
 // ── Armoires ──────────────────────────────────────────────────────────────────
 export const armoiresAPI = {
-  list:          (params)    => api.get('/armoires/', { params }),
-  get:           (id)        => api.get(`/armoires/${id}/`),
-  create:        (data)      => api.post('/armoires/', data),
-  update:        (id, data)  => api.patch(`/armoires/${id}/`, data),
-  delete:        (id)        => api.delete(`/armoires/${id}/`),
-  getRayons:     (params)    => api.get('/armoires/rayons/', { params }),
-  createRayon:   (data)      => api.post('/armoires/rayons/', data),
-  updateRayon:   (id, data)  => api.patch(`/armoires/rayons/${id}/`, data),
-  deleteRayon:   (id)        => api.delete(`/armoires/rayons/${id}/`),
+  list:         (params)    => api.get('/armoires/', { params }),
+  get:          (id)        => api.get(`/armoires/${id}/`),
+  create:       (data)      => api.post('/armoires/', data),
+  update:       (id, data)  => api.patch(`/armoires/${id}/`, data),
+  delete:       (id)        => api.delete(`/armoires/${id}/`),
+  getRayons:    (id)        => api.get(`/armoires/${id}/rayons/`),
+  createRayon:  (id, data)  => api.post(`/armoires/${id}/rayons/`, data),
 }
 
 // ── Documents ─────────────────────────────────────────────────────────────────
 export const documentsAPI = {
-  list:           (params)   => api.get('/documents/', { params }),
-  get:            (id)       => api.get(`/documents/${id}/`),
-  create:         (data)     => api.post('/documents/', data, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  }),
-  update:         (id, data) => api.patch(`/documents/${id}/`, data, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  }),
-  delete:         (id)       => api.delete(`/documents/${id}/`),
-  deplacer:       (id, rayonId) => api.post(`/documents/${id}/deplacer/`, { rayon_id: rayonId }),
-  updateMetadata: (id, data) => api.patch(`/documents/${id}/metadata/`, data),
+  list:         (params)    => api.get('/documents/', { params }),
+  get:          (id)        => api.get(`/documents/${id}/`),
+  create:       (data)      => api.post('/documents/', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  update:       (id, data)  => api.patch(`/documents/${id}/`, data),
+  delete:       (id)        => api.delete(`/documents/${id}/`),
+  deplacer:     (id, data)  => api.post(`/documents/${id}/deplacer/`, data),
+  updateMeta:   (id, data)  => api.patch(`/documents/${id}/metadata/`, data),
+
   getStats:       ()         => api.get('/documents/stats/'),
   getStatsPeriode:(params)   => api.get('/documents/stats/periode/', { params }),
 
-  // Export CSV / PDF (téléchargement direct via lien — token dans Authorization header)
+  // Export CSV / PDF sécurisé via le token JWT
   exportCSV: async (params = {}) => {
     const token = localStorage.getItem('access_token')
-    const qs = new URLSearchParams(params).toString()
-    const response = await fetch(`/api/documents/export/csv/?${qs}`, {
+    const qs    = new URLSearchParams(params).toString()
+    const res   = await fetch(`/api/documents/export/csv/?${qs}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-    if (!response.ok) throw new Error('Erreur export CSV')
-    const blob = await response.blob()
+    if (!res.ok) throw new Error('Erreur export CSV')
+    const blob = await res.blob()
     const url  = window.URL.createObjectURL(blob)
-    const a    = document.createElement('a')
-    a.href     = url
-    a.download = `documents_${new Date().toISOString().slice(0,10)}.csv`
+    const a    = Object.assign(document.createElement('a'), {
+      href: url, download: `documents_${new Date().toISOString().slice(0,10)}.csv`
+    })
     a.click()
     window.URL.revokeObjectURL(url)
   },
 
   exportPDF: async (params = {}) => {
     const token = localStorage.getItem('access_token')
-    const qs = new URLSearchParams(params).toString()
-    const response = await fetch(`/api/documents/export/pdf/?${qs}`, {
+    const qs    = new URLSearchParams(params).toString()
+    const res   = await fetch(`/api/documents/export/pdf/?${qs}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-    if (!response.ok) throw new Error('Erreur export PDF')
-    const blob = await response.blob()
+    if (!res.ok) throw new Error('Erreur export PDF')
+    const blob = await res.blob()
     const url  = window.URL.createObjectURL(blob)
-    const a    = document.createElement('a')
-    a.href     = url
-    a.download = `documents_${new Date().toISOString().slice(0,10)}.pdf`
+    const a    = Object.assign(document.createElement('a'), {
+      href: url, download: `documents_${new Date().toISOString().slice(0,10)}.pdf`
+    })
     a.click()
     window.URL.revokeObjectURL(url)
   },
 
-  // Téléchargement sécurisé — passe par l'API avec le token JWT
-  getDownloadUrl:  (id) => `/api/documents/${id}/telecharger/`,
-  getPreviewUrl:   (id) => `/api/documents/${id}/previsualiser/`,
-
-  // Pour télécharger en blob avec le token
-  download: async (id, nomFichier) => {
+  // Téléchargement / prévisualisation sécurisés
+  telecharger: async (id, nomFichier) => {
     const token = localStorage.getItem('access_token')
-    const response = await fetch(`/api/documents/${id}/telecharger/`, {
+    const res   = await fetch(`/api/documents/${id}/telecharger/`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-    if (!response.ok) throw new Error('Erreur téléchargement')
-    const blob = await response.blob()
+    if (!res.ok) throw new Error('Erreur téléchargement')
+    const blob = await res.blob()
     const url  = window.URL.createObjectURL(blob)
-    const a    = document.createElement('a')
-    a.href     = url
-    a.download = nomFichier || 'document'
+    const a    = Object.assign(document.createElement('a'), { href: url, download: nomFichier })
     a.click()
     window.URL.revokeObjectURL(url)
+  },
+
+  previsualiser: async (id) => {
+    const token = localStorage.getItem('access_token')
+    const res   = await fetch(`/api/documents/${id}/previsualiser/`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!res.ok) throw new Error('Erreur prévisualisation')
+    const blob = await res.blob()
+    return window.URL.createObjectURL(blob)
   },
 }
 
 // ── Journal ───────────────────────────────────────────────────────────────────
 export const journalAPI = {
-  list: (params) => api.get("/journal/", { params }),
+  list: (params) => api.get('/journal/', { params }),
 
   exportCSV: async (params = {}) => {
-    const token = localStorage.getItem("access_token")
-    const qs = new URLSearchParams(params).toString()
-    const response = await fetch(`/api/journal/export/csv/?${qs}`, {
+    const token = localStorage.getItem('access_token')
+    const qs    = new URLSearchParams(params).toString()
+    const res   = await fetch(`/api/journal/export/csv/?${qs}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-    if (!response.ok) throw new Error("Erreur export journal CSV")
-    const blob = await response.blob()
+    if (!res.ok) throw new Error('Erreur export journal CSV')
+    const blob = await res.blob()
     const url  = window.URL.createObjectURL(blob)
-    const a    = document.createElement("a")
-    a.href     = url
-    a.download = `journal_${new Date().toISOString().slice(0,10)}.csv`
+    const a    = Object.assign(document.createElement('a'), {
+      href: url, download: `journal_${new Date().toISOString().slice(0,10)}.csv`
+    })
     a.click()
     window.URL.revokeObjectURL(url)
   },
 
   exportPDF: async (params = {}) => {
-    const token = localStorage.getItem("access_token")
-    const qs = new URLSearchParams(params).toString()
-    const response = await fetch(`/api/journal/export/pdf/?${qs}`, {
+    const token = localStorage.getItem('access_token')
+    const qs    = new URLSearchParams(params).toString()
+    const res   = await fetch(`/api/journal/export/pdf/?${qs}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-    if (!response.ok) throw new Error("Erreur export journal PDF")
-    const blob = await response.blob()
+    if (!res.ok) throw new Error('Erreur export journal PDF')
+    const blob = await res.blob()
     const url  = window.URL.createObjectURL(blob)
-    const a    = document.createElement("a")
-    a.href     = url
-    a.download = `journal_${new Date().toISOString().slice(0,10)}.pdf`
+    const a    = Object.assign(document.createElement('a'), {
+      href: url, download: `journal_${new Date().toISOString().slice(0,10)}.pdf`
+    })
     a.click()
     window.URL.revokeObjectURL(url)
   },

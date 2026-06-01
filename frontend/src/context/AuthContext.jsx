@@ -7,6 +7,16 @@ export function AuthProvider({ children }) {
   const [user, setUser]       = useState(null)
   const [loading, setLoading] = useState(true)
 
+  // Écoute l'événement d'expiration de session émis par l'intercepteur Axios
+  useEffect(() => {
+    const handleExpired = () => {
+      setUser(null)
+      // Le redirect est géré dans api.js après 1.5s
+    }
+    window.addEventListener('auth:expired', handleExpired)
+    return () => window.removeEventListener('auth:expired', handleExpired)
+  }, [])
+
   useEffect(() => {
     const token = localStorage.getItem('access_token')
     if (token) {

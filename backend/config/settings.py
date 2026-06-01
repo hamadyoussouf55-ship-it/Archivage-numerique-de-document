@@ -118,3 +118,6 @@ SWAGGER_SETTINGS = {
         'Bearer': {'type': 'apiKey', 'name': 'Authorization', 'in': 'header'}
     }
 }
+
+# Taille maximale des fichiers uploadés (en Mo)
+DOCUMENT_MAX_SIZE_MB = 50
