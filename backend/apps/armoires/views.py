@@ -26,6 +26,24 @@ class ArmoireDetailView(generics.RetrieveUpdateDestroyAPIView):
         return [permissions.IsAuthenticated()] if self.request.method == 'GET' else [IsAdmin()]
 
 
+class RayonParArmoireView(generics.ListCreateAPIView):
+    """
+    GET  /api/armoires/<pk>/rayons/  → liste les rayons d'une armoire
+    POST /api/armoires/<pk>/rayons/  → crée un rayon dans cette armoire
+    """
+    serializer_class = RayonSerializer
+
+    def get_queryset(self):
+        return Rayon.objects.filter(armoire=self.kwargs['pk']).select_related('armoire')
+
+    def get_permissions(self):
+        return [IsAdminOrArchiviste()] if self.request.method == 'POST' else [permissions.IsAuthenticated()]
+
+    def perform_create(self, serializer):
+        armoire = Armoire.objects.get(pk=self.kwargs['pk'])
+        serializer.save(armoire=armoire)
+
+
 class RayonListCreateView(generics.ListCreateAPIView):
     queryset         = Rayon.objects.select_related('armoire').all()
     serializer_class = RayonSerializer

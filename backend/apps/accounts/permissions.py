@@ -44,6 +44,9 @@ class CanAccessDocument(BasePermission):
             return True
 
         # Consultant : accès lecture uniquement
+        if request.method not in ('GET', 'HEAD', 'OPTIONS'):
+            return False
+
         # Vérifier si des rôles département/service sont définis
         from apps.entreprise.models import RoleDepartementService
         roles = RoleDepartementService.objects.filter(collaborateur=user)

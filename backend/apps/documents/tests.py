@@ -42,7 +42,7 @@ def make_armoire(entreprise):
 
 def make_rayon(armoire):
     return Rayon.objects.create(
-        code='R01', niveau=1, armoire=armoire, description='Rayon 1'
+        nom='Rayon 1', code='R01', position='1', armoire=armoire
     )
 
 
@@ -75,7 +75,7 @@ class DocumentModelTests(TestCase):
         parts = doc.code_unique.split('-')
         # SYG - TYPE - ARMOIRE_CODE - RAYON_CODE - ANNEE - XXXX
         self.assertEqual(parts[0], 'SYG')
-        self.assertIn('FACTURE', doc.code_unique)
+        self.assertIn('FAC', doc.code_unique)
 
     def test_statut_default_actif(self):
         doc = make_doc(self.ray, self.admin)
@@ -270,6 +270,145 @@ class FileValidationTests(TestCase):
         for doc in Document.objects.all():
             if doc.fichier:
                 try:
+                    if os.path.exists(doc.fichier.path):
+                        os.remove(doc.fichier.path)
+                except Exception:
+                    pass
+
+
+class VersionDocumentTests(TestCase):
+    """Tests du système de versionnement."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.ent, self.dept, self.svc = make_base_data()
+        self.admin      = make_user('ADMIN',      'ADM01', self.svc)
+        self.archiviste = make_user('ARCHIVISTE', 'ARC01', self.svc)
+        self.consultant = make_user('CONSULTANT', 'CON01', self.svc)
+        self.arm = make_armoire(self.ent)
+        self.ray = make_rayon(self.arm)
+        self.doc = make_doc(self.ray, self.admin)
+
+    def _auth(self, user):
+        self.client.force_authenticate(user=user)
+
+    def _nouvelle_version(self, doc_id, user, commentaire='Test v'):
+        self._auth(user)
+        f = SimpleUploadedFile('v2.pdf', b'%PDF-1.4 version 2', content_type='application/pdf')
+        return self.client.post(
+            reverse('document-versions', kwargs={'pk': doc_id}),
+            {'fichier': f, 'commentaire': commentaire},
+            format='multipart'
+        )
+
+    def test_list_versions_empty(self):
+        """Un nouveau document n'a pas encore de versions."""
+        self._auth(self.consultant)
+        r = self.client.get(reverse('document-versions', kwargs={'pk': self.doc.pk}))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.data['nombre_versions'], 0)
+
+    def test_archiviste_can_add_version(self):
+        """Un archiviste peut ajouter une nouvelle version."""
+        r = self._nouvelle_version(self.doc.pk, self.archiviste, 'Correction signature')
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(r.data['numero_version'], 2)  # 1=initiale auto, 2=nouvelle
+        self.assertTrue(r.data['est_courante'])
+
+    def test_consultant_cannot_add_version(self):
+        """Un consultant ne peut pas ajouter de version."""
+        self._auth(self.consultant)
+        f = SimpleUploadedFile('v2.pdf', b'%PDF-1.4', content_type='application/pdf')
+        r = self.client.post(
+            reverse('document-versions', kwargs={'pk': self.doc.pk}),
+            {'fichier': f, 'commentaire': 'test'},
+            format='multipart'
+        )
+        self.assertEqual(r.status_code, 403)
+
+    def test_version_number_increments(self):
+        """Les numéros de version s'incrémentent automatiquement."""
+        self._nouvelle_version(self.doc.pk, self.admin, 'v2')
+        self._nouvelle_version(self.doc.pk, self.admin, 'v3')
+        self._auth(self.consultant)
+        r = self.client.get(reverse('document-versions', kwargs={'pk': self.doc.pk}))
+        self.assertEqual(r.data['nombre_versions'], 3)  # v1 initiale + v2 + v3
+
+    def test_latest_version_is_courante(self):
+        """La dernière version ajoutée est marquée comme courante."""
+        self._nouvelle_version(self.doc.pk, self.admin, 'v2')
+        self._nouvelle_version(self.doc.pk, self.admin, 'v3')
+        self._auth(self.consultant)
+        r = self.client.get(reverse('document-versions', kwargs={'pk': self.doc.pk}))
+        courantes = [v for v in r.data['versions'] if v['est_courante']]
+        self.assertEqual(len(courantes), 1)
+        self.assertEqual(courantes[0]['numero_version'], 3)
+
+    def test_admin_can_restore_version(self):
+        """Un admin peut restaurer une ancienne version."""
+        self._nouvelle_version(self.doc.pk, self.admin, 'v2')
+        # Récupérer la v1
+        self._auth(self.admin)
+        r_list = self.client.get(reverse('document-versions', kwargs={'pk': self.doc.pk}))
+        v1 = next(v for v in r_list.data['versions'] if v['numero_version'] == 1)
+        # Restaurer v1
+        r = self.client.post(
+            reverse('version-restaurer', kwargs={'pk': self.doc.pk, 'v_pk': v1['id']})
+        )
+        self.assertEqual(r.status_code, 200)
+        # Vérifier que v1 est courante
+        r_list2 = self.client.get(reverse('document-versions', kwargs={'pk': self.doc.pk}))
+        courante = next(v for v in r_list2.data['versions'] if v['est_courante'])
+        self.assertEqual(courante['numero_version'], 1)
+
+    def test_consultant_cannot_restore(self):
+        """Un consultant ne peut pas restaurer une version."""
+        self._nouvelle_version(self.doc.pk, self.admin, 'v2')
+        self._auth(self.admin)
+        r_list = self.client.get(reverse('document-versions', kwargs={'pk': self.doc.pk}))
+        v1 = next(v for v in r_list.data['versions'] if v['numero_version'] == 1)
+        self._auth(self.consultant)
+        r = self.client.post(
+            reverse('version-restaurer', kwargs={'pk': self.doc.pk, 'v_pk': v1['id']})
+        )
+        self.assertEqual(r.status_code, 403)
+
+    def test_cannot_delete_current_version(self):
+        """On ne peut pas supprimer la version courante."""
+        self._nouvelle_version(self.doc.pk, self.admin, 'v2')
+        self._auth(self.admin)
+        r_list = self.client.get(reverse('document-versions', kwargs={'pk': self.doc.pk}))
+        courante = next(v for v in r_list.data['versions'] if v['est_courante'])
+        r = self.client.delete(
+            reverse('version-detail', kwargs={'pk': self.doc.pk, 'v_pk': courante['id']})
+        )
+        self.assertEqual(r.status_code, 400)
+
+    def test_admin_can_delete_old_version(self):
+        """Un admin peut supprimer une ancienne version."""
+        self._nouvelle_version(self.doc.pk, self.admin, 'v2')
+        self._auth(self.admin)
+        r_list = self.client.get(reverse('document-versions', kwargs={'pk': self.doc.pk}))
+        v1 = next(v for v in r_list.data['versions'] if v['numero_version'] == 1)
+        r = self.client.delete(
+            reverse('version-detail', kwargs={'pk': self.doc.pk, 'v_pk': v1['id']})
+        )
+        self.assertEqual(r.status_code, 204)
+
+    def tearDown(self):
+        from .models import VersionDocument
+        for v in VersionDocument.objects.all():
+            if v.fichier:
+                try:
+                    import os
+                    if os.path.exists(v.fichier.path):
+                        os.remove(v.fichier.path)
+                except Exception:
+                    pass
+        for doc in Document.objects.all():
+            if doc.fichier:
+                try:
+                    import os
                     if os.path.exists(doc.fichier.path):
                         os.remove(doc.fichier.path)
                 except Exception:

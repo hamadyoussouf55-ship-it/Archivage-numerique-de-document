@@ -38,12 +38,12 @@ class ArmoireModelTests(TestCase):
 
     def test_rayon_str(self):
         arm = Armoire.objects.create(nom='Armoire B', code='ARM-B')
-        ray = Rayon.objects.create(code='R01', niveau=1, armoire=arm)
+        ray = Rayon.objects.create(nom='Rayon 1', code='R01', position='1', armoire=arm)
         self.assertIn('R01', str(ray))
 
     def test_rayon_belongs_to_armoire(self):
         arm = Armoire.objects.create(nom='Armoire C', code='ARM-C')
-        ray = Rayon.objects.create(code='R02', niveau=2, armoire=arm)
+        ray = Rayon.objects.create(nom='Rayon 2', code='R02', position='2', armoire=arm)
         self.assertEqual(ray.armoire, arm)
 
 
@@ -66,7 +66,7 @@ class ArmoireAPITests(TestCase):
         self.client.force_authenticate(user=self.admin)
         r = self.client.post(reverse('armoire-list'), {
             'nom': 'Armoire Test', 'code': 'ARM-T',
-            'description': 'test'
+            'entreprise': str(self.ent.pk), 'description': 'test'
         })
         self.assertEqual(r.status_code, status.HTTP_201_CREATED)
 
@@ -74,6 +74,7 @@ class ArmoireAPITests(TestCase):
         self.client.force_authenticate(user=self.consultant)
         r = self.client.post(reverse('armoire-list'), {
             'nom': 'Armoire X', 'code': 'ARM-X',
+            'entreprise': str(self.ent.pk),
         })
         self.assertEqual(r.status_code, status.HTTP_403_FORBIDDEN)
 

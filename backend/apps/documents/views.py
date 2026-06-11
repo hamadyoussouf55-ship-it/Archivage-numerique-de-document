@@ -12,11 +12,11 @@ from rest_framework.filters import SearchFilter
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Count, Q
 
-from .models import Document, MetadataDocument, DocumentVersion, DocumentShare
+from .models import Document, MetadataDocument, DocumentShare
 from .serializers import (
     DocumentSerializer, DocumentCreateSerializer,
     DocumentListSerializer, MetadataDocumentSerializer,
-    DocumentVersionSerializer, DocumentShareSerializer,
+    DocumentShareSerializer,
 )
 from apps.accounts.permissions import IsAdminOrArchiviste, CanAccessDocument
 from apps.armoires.models import Rayon
@@ -73,7 +73,7 @@ class DocumentDetailView(generics.RetrieveUpdateDestroyAPIView):
     def perform_update(self, serializer):
         ancien_fichier = self.get_object().fichier
         doc = serializer.save()
-        # Si le fichier a ete remplace/modifie, on re-extrait le texte
+        # Si le fichier a été modifié, on re-extrait le texte
         if doc.fichier != ancien_fichier:
             indexer_document_texte(doc)
         enregistrer_action(
@@ -370,167 +370,6 @@ class DocumentPurgerView(APIView):
             ip=request.META.get('REMOTE_ADDR', ''),
         )
         return Response({"detail": "Document purge definitivement."})
-
-
-# ── Versioning Views ───────────────────────────────────────────────────────────
-
-class DocumentVersionListView(generics.ListAPIView):
-    """Liste de toutes les versions d'un document."""
-    permission_classes = [CanAccessDocument]
-    serializer_class = DocumentVersionSerializer
-
-    def get_queryset(self):
-        doc_id = self.kwargs['pk']
-        # Verifier l'existence et les permissions
-        try:
-            doc = Document.objects.get(id=doc_id)
-        except Document.DoesNotExist:
-            raise Http404("Document introuvable.")
-        self.check_object_permissions(self.request, doc)
-        return DocumentVersion.objects.filter(document_id=doc_id).select_related('createur')
-
-
-class DocumentVersionUploadView(APIView):
-    """Televerser une nouvelle version pour un document."""
-    permission_classes = [IsAdminOrArchiviste]
-    parser_classes = [MultiPartParser, FormParser]
-
-    def post(self, request, pk):
-        try:
-            doc = Document.objects.get(pk=pk)
-        except Document.DoesNotExist:
-            return Response({"detail": "Document introuvable."}, status=404)
-
-        if doc.statut == 'SUPPRIME':
-            return Response({"detail": "Impossible d'ajouter une version a un document supprime."}, status=400)
-
-        fichier = request.FILES.get('fichier')
-        if not fichier:
-            return Response({"detail": "Fichier requis."}, status=400)
-
-        # Valider le fichier avec le validateur
-        from .validators import validate_document_file
-        try:
-            validate_document_file(fichier)
-        except Exception as e:
-            return Response({"detail": str(e)}, status=400)
-
-        with transaction.atomic():
-            # Determiner le numero de la nouvelle version
-            derniere_version = DocumentVersion.objects.filter(document=doc).order_by('-numero_version').first()
-            nouveau_numero = (derniere_version.numero_version + 1) if derniere_version else 1
-
-            # Mettre a jour le document principal
-            doc.fichier = fichier
-            doc.nom_fichier = fichier.name.split('/')[-1]
-            doc.taille = fichier.size
-            doc.save()
-
-            # Creer la nouvelle version
-            version = DocumentVersion.objects.create(
-                document=doc,
-                numero_version=nouveau_numero,
-                fichier=fichier,
-                nom_fichier=doc.nom_fichier,
-                taille=doc.taille,
-                createur=request.user
-            )
-
-        # Mettre a jour l'indexation de texte
-        indexer_document_texte(doc)
-
-        enregistrer_action(
-            auteur=request.user, type_action='MODIFICATION', document=doc,
-            details=f"Nouvelle version creee : v{nouveau_numero}",
-            ip=request.META.get('REMOTE_ADDR', ''),
-        )
-
-        return Response(DocumentVersionSerializer(version).data, status=status.HTTP_201_CREATED)
-
-
-class DocumentVersionDownloadView(APIView):
-    """Telechargement securise d'une version historique specifique."""
-    permission_classes = [CanAccessDocument]
-
-    def get(self, request, version_pk):
-        try:
-            version = DocumentVersion.objects.select_related('document').get(pk=version_pk)
-        except DocumentVersion.DoesNotExist:
-            raise Http404("Version introuvable.")
-
-        # Verifier permissions sur le document parent
-        self.check_object_permissions(request, version.document)
-
-        if version.document.statut == 'SUPPRIME':
-            return Response({"detail": "Document supprime."}, status=404)
-
-        file_path = os.path.join(settings.MEDIA_ROOT, str(version.fichier))
-        if not os.path.exists(file_path):
-            return Response({"detail": "Fichier introuvable sur le serveur."}, status=404)
-
-        enregistrer_action(
-            auteur=request.user, type_action='TELECHARGEMENT', document=version.document,
-            details=f"Telechargement de la version v{version.numero_version} : {version.nom_fichier}",
-            ip=request.META.get('REMOTE_ADDR', ''),
-        )
-
-        content_type, _ = mimetypes.guess_type(file_path)
-        content_type = content_type or 'application/octet-stream'
-
-        response = FileResponse(
-            open(file_path, 'rb'),
-            content_type=content_type,
-            as_attachment=True,
-            filename=version.nom_fichier or os.path.basename(file_path),
-        )
-        return response
-
-
-class DocumentVersionRestoreView(APIView):
-    """Restaure une version historique specifique en tant que version courante."""
-    permission_classes = [IsAdminOrArchiviste]
-
-    def post(self, request, version_pk):
-        try:
-            version_a_restaurer = DocumentVersion.objects.select_related('document').get(pk=version_pk)
-        except DocumentVersion.DoesNotExist:
-            return Response({"detail": "Version introuvable."}, status=404)
-
-        doc = version_a_restaurer.document
-        if doc.statut == 'SUPPRIME':
-            return Response({"detail": "Impossible de restaurer une version sur un document supprime."}, status=400)
-
-        with transaction.atomic():
-            # Determiner le numero de la version suivante
-            derniere_version = DocumentVersion.objects.filter(document=doc).order_by('-numero_version').first()
-            nouveau_numero = (derniere_version.numero_version + 1) if derniere_version else 1
-
-            # Copier le fichier de la version a restaurer vers le document principal
-            doc.fichier = version_a_restaurer.fichier
-            doc.nom_fichier = version_a_restaurer.nom_fichier
-            doc.taille = version_a_restaurer.taille
-            doc.save()
-
-            # Creer une nouvelle version N+1 qui a le meme contenu
-            nouvelle_version = DocumentVersion.objects.create(
-                document=doc,
-                numero_version=nouveau_numero,
-                fichier=version_a_restaurer.fichier,
-                nom_fichier=version_a_restaurer.nom_fichier,
-                taille=version_a_restaurer.taille,
-                createur=request.user
-            )
-
-        # Mettre a jour l'indexation de texte
-        indexer_document_texte(doc)
-
-        enregistrer_action(
-            auteur=request.user, type_action='MODIFICATION', document=doc,
-            details=f"Restauration de la version v{version_a_restaurer.numero_version} en v{nouveau_numero}",
-            ip=request.META.get('REMOTE_ADDR', ''),
-        )
-
-        return Response(DocumentSerializer(doc).data)
 
 
 # ── Sharing Views ──────────────────────────────────────────────────────────────

@@ -109,6 +109,7 @@ export const armoiresAPI = {
   delete:       (id)        => api.delete(`/armoires/${id}/`),
   getRayons:    (id)        => api.get(`/armoires/${id}/rayons/`),
   createRayon:  (id, data)  => api.post(`/armoires/${id}/rayons/`, data),
+  deleteRayon:  (id)        => api.delete(`/armoires/rayons/${id}/`),
 }
 
 // ── Documents ─────────────────────────────────────────────────────────────────
@@ -156,6 +157,12 @@ export const documentsAPI = {
     a.click()
     window.URL.revokeObjectURL(url)
   },
+
+  // Versionnement
+  getVersions:      (docId)         => api.get(`/documents/${docId}/versions/`),
+  ajouterVersion:   (docId, data)   => api.post(`/documents/${docId}/versions/`, data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  restaurerVersion: (docId, vId)    => api.post(`/documents/${docId}/versions/${vId}/restaurer/`),
+  supprimerVersion: (docId, vId)    => api.delete(`/documents/${docId}/versions/${vId}/`),
 
   // Téléchargement / prévisualisation sécurisés
   telecharger: async (id, nomFichier) => {

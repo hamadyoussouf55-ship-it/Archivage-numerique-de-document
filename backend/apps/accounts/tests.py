@@ -31,7 +31,7 @@ def make_user(role='ADMIN', matricule='ADM001', service=None, **kwargs):
     u = Collaborateur.objects.create_user(
         matricule=matricule,
         password='TestPass123!',
-        nom='Test', prenom='User',
+        nom='User', prenom='Test',
         email=f'{matricule.lower()}@sygalin.test',
         role=role,
         service=service,
@@ -49,30 +49,30 @@ class AuthenticationTests(TestCase):
         self.admin = make_user(role='ADMIN', matricule='ADM001', service=self.svc)
 
     def test_login_success(self):
-        url = reverse('token_obtain_pair')
-        r = self.client.post(url, {'matricule': 'ADM001', 'password': 'TestPass123!'})
+        url = reverse('login')
+        r = self.client.post(url, {'email': 'adm001@sygalin.test', 'password': 'TestPass123!'})
         self.assertEqual(r.status_code, status.HTTP_200_OK)
         self.assertIn('access', r.data)
         self.assertIn('refresh', r.data)
 
     def test_login_wrong_password(self):
-        url = reverse('token_obtain_pair')
-        r = self.client.post(url, {'matricule': 'ADM001', 'password': 'WrongPass!'})
+        url = reverse('login')
+        r = self.client.post(url, {'email': 'adm001@sygalin.test', 'password': 'WrongPass!'})
         self.assertEqual(r.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_login_unknown_user(self):
-        url = reverse('token_obtain_pair')
-        r = self.client.post(url, {'matricule': 'ZZZ999', 'password': 'Pass!'})
+        url = reverse('login')
+        r = self.client.post(url, {'email': 'zzz999@sygalin.test', 'password': 'Pass!'})
         self.assertEqual(r.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_profile_requires_auth(self):
-        url = reverse('profile')
+        url = reverse('me')
         r = self.client.get(url)
         self.assertEqual(r.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_profile_returns_user_data(self):
         self.client.force_authenticate(user=self.admin)
-        url = reverse('profile')
+        url = reverse('me')
         r = self.client.get(url)
         self.assertEqual(r.status_code, status.HTTP_200_OK)
         self.assertEqual(r.data['matricule'], 'ADM001')
@@ -80,8 +80,8 @@ class AuthenticationTests(TestCase):
 
     def test_logout_blacklists_token(self):
         # Login
-        url_login = reverse('token_obtain_pair')
-        r = self.client.post(url_login, {'matricule': 'ADM001', 'password': 'TestPass123!'})
+        url_login = reverse('login')
+        r = self.client.post(url_login, {'email': 'adm001@sygalin.test', 'password': 'TestPass123!'})
         refresh = r.data['refresh']
         self.client.force_authenticate(user=self.admin)
         # Logout

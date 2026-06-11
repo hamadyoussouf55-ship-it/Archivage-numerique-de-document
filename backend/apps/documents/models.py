@@ -39,7 +39,6 @@ class Document(models.Model):
         return f"{self.code_unique} - {self.titre}"
 
     def save(self, *args, **kwargs):
-        is_new = self._state.adding
         if self.fichier:
             self.nom_fichier    = self.fichier.name.split('/')[-1]
             self.chemin_stockage = self.fichier.name
@@ -52,7 +51,7 @@ class Document(models.Model):
             from apps.armoires.models import Rayon
             try:
                 with transaction.atomic():
-                    # Verrouille le rayon pour éviter les collisions de code séquentiel concurrentes
+                    # Verrouille le rayon pour bloquer d'autres écritures simultanées sur le même rayon
                     Rayon.objects.select_for_update().get(id=self.rayon_id)
                     self.code_unique = self._generer_code()
                     super().save(*args, **kwargs)
@@ -60,20 +59,6 @@ class Document(models.Model):
                 super().save(*args, **kwargs)
         else:
             super().save(*args, **kwargs)
-
-        # Si nouveau document, on crée automatiquement la version 1
-        if is_new and self.fichier:
-            try:
-                DocumentVersion.objects.create(
-                    document=self,
-                    numero_version=1,
-                    fichier=self.fichier,
-                    nom_fichier=self.nom_fichier,
-                    taille=self.taille,
-                    createur=self.createur
-                )
-            except Exception:
-                pass
 
     def _generer_code(self):
         try:
@@ -98,39 +83,67 @@ class Document(models.Model):
         return f"{t:.1f} To"
 
 
+def version_upload_path(instance, filename):
+    now = timezone.now()
+    return f"documents/versions/{now.year}/{now.month:02d}/{filename}"
+
+
+class VersionDocument(models.Model):
+    """Historique des versions d'un document."""
+    id              = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    document        = models.ForeignKey(Document, on_delete=models.CASCADE, related_name='versions')
+    numero_version  = models.PositiveIntegerField()
+    fichier         = models.FileField(upload_to=version_upload_path)
+    nom_fichier     = models.CharField(max_length=255, blank=True)
+    taille          = models.BigIntegerField(default=0)
+    commentaire     = models.TextField(blank=True, help_text="Motif ou description de la modification")
+    cree_par        = models.ForeignKey('accounts.Collaborateur', on_delete=models.SET_NULL,
+                                        null=True, related_name='versions_creees')
+    date_creation   = models.DateTimeField(auto_now_add=True)
+    est_courante    = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name = "Version de document"
+        ordering     = ['-numero_version']
+        unique_together = [['document', 'numero_version']]
+
+    def __str__(self):
+        return f"{self.document.code_unique} — v{self.numero_version}"
+
+    def save(self, *args, **kwargs):
+        if self.fichier:
+            self.nom_fichier = self.fichier.name.split('/')[-1]
+            try:
+                self.taille = self.fichier.size
+            except Exception:
+                self.taille = 0
+        super().save(*args, **kwargs)
+
+    @property
+    def taille_lisible(self):
+        t = self.taille
+        for unit in ['o', 'Ko', 'Mo', 'Go']:
+            if t < 1024:
+                return f"{t:.1f} {unit}"
+            t /= 1024
+        return f"{t:.1f} To"
+
+
 class MetadataDocument(models.Model):
-    id             = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    document       = models.OneToOneField(Document, on_delete=models.CASCADE, related_name='metadata')
-    auteur         = models.CharField(max_length=200, blank=True)
-    date_emission  = models.DateField(null=True, blank=True)
-    mots_cles      = models.JSONField(default=list, blank=True)
-    destinataire   = models.CharField(max_length=200, blank=True)
-    description    = models.TextField(blank=True)
-    texte_extrait  = models.TextField(blank=True, default='')
+    id            = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    document      = models.OneToOneField(Document, on_delete=models.CASCADE, related_name='metadata')
+    auteur        = models.CharField(max_length=200, blank=True)
+    date_emission = models.DateField(null=True, blank=True)
+    mots_cles     = models.JSONField(default=list, blank=True)
+    destinataire  = models.CharField(max_length=200, blank=True)
+    description   = models.TextField(blank=True)
+    texte_extrait = models.TextField(blank=True, default='')
 
     class Meta:
         verbose_name = "Metadonnee"
 
     def __str__(self):
         return f"Metadonnees - {self.document.code_unique}"
-
-
-class DocumentVersion(models.Model):
-    id             = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    document       = models.ForeignKey(Document, on_delete=models.CASCADE, related_name='versions')
-    numero_version = models.IntegerField(default=1)
-    fichier        = models.FileField(upload_to=document_upload_path)
-    nom_fichier    = models.CharField(max_length=255)
-    taille         = models.BigIntegerField(default=0)
-    date_creation  = models.DateTimeField(auto_now_add=True)
-    createur       = models.ForeignKey('accounts.Collaborateur', on_delete=models.SET_NULL, null=True, related_name='versions_crees')
-
-    class Meta:
-        verbose_name = "Version de Document"
-        ordering     = ['-numero_version']
-
-    def __str__(self):
-        return f"{self.document.code_unique} v{self.numero_version}"
 
 
 class DocumentShare(models.Model):

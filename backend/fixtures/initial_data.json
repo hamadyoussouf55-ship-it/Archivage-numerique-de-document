@@ -1,97 +1,193 @@
 [
   {
-    "model": "entreprise.entreprise",
-    "pk": "11111111-1111-1111-1111-111111111111",
-    "fields": { "nom": "SYGALIN SAS", "adresse": "Ngaoundere, Cameroun", "logo": "" }
-  },
-  {
     "model": "entreprise.departement",
     "pk": "22222222-2222-2222-2222-222222222201",
-    "fields": { "entreprise": "11111111-1111-1111-1111-111111111111", "nom": "Direction Generale", "code": "DG" }
+    "fields": { "nom": "Direction Generale", "code": "DG" }
   },
   {
     "model": "entreprise.departement",
     "pk": "22222222-2222-2222-2222-222222222202",
-    "fields": { "entreprise": "11111111-1111-1111-1111-111111111111", "nom": "Comptabilite Finance", "code": "COMPTA" }
+    "fields": { "nom": "Direction Comptabilite et Fiscalite", "code": "DCF" }
   },
   {
     "model": "entreprise.departement",
     "pk": "22222222-2222-2222-2222-222222222203",
-    "fields": { "entreprise": "11111111-1111-1111-1111-111111111111", "nom": "Ressources Humaines", "code": "RH" }
+    "fields": { "nom": "Direction des Ressources Humaines et Conseil Juridique", "code": "DRHCJ" }
   },
   {
     "model": "entreprise.departement",
     "pk": "22222222-2222-2222-2222-222222222204",
-    "fields": { "entreprise": "11111111-1111-1111-1111-111111111111", "nom": "Informatique", "code": "IT" }
+    "fields": { "nom": "Direction des Systemes d Information", "code": "DSI" }
   },
   {
-    "model": "entreprise.service",
-    "pk": "33333333-3333-3333-3333-333333333301",
-    "fields": { "departement": "22222222-2222-2222-2222-222222222202", "nom": "Facturation", "code": "FACT" }
+    "model": "entreprise.departement",
+    "pk": "22222222-2222-2222-2222-222222222205",
+    "fields": { "nom": "Direction Financiere", "code": "DFIN" }
   },
   {
-    "model": "entreprise.service",
-    "pk": "33333333-3333-3333-3333-333333333302",
-    "fields": { "departement": "22222222-2222-2222-2222-222222222202", "nom": "Tresorerie", "code": "TRES" }
+    "model": "entreprise.departement",
+    "pk": "22222222-2222-2222-2222-222222222206",
+    "fields": { "nom": "Direction Commerciale", "code": "DCO" }
   },
   {
-    "model": "entreprise.service",
-    "pk": "33333333-3333-3333-3333-333333333303",
-    "fields": { "departement": "22222222-2222-2222-2222-222222222203", "nom": "Recrutement", "code": "RECR" }
+    "model": "entreprise.departement",
+    "pk": "22222222-2222-2222-2222-222222222207",
+    "fields": { "nom": "Direction des Strategies et de la Formation", "code": "DSF" }
   },
   {
-    "model": "entreprise.service",
-    "pk": "33333333-3333-3333-3333-333333333304",
-    "fields": { "departement": "22222222-2222-2222-2222-222222222204", "nom": "Developpement", "code": "DEV" }
+    "model": "entreprise.departement",
+    "pk": "22222222-2222-2222-2222-222222222208",
+    "fields": { "nom": "Direction de la Logistique", "code": "DLOG" }
   },
   {
-    "model": "armoires.armoire",
-    "pk": "44444444-4444-4444-4444-444444444401",
-    "fields": { "nom": "Armoire Comptabilite", "code": "ARM-COMPTA", "description": "Documents comptables", "date_creation": "2025-01-01T00:00:00Z" }
+    "model": "entreprise.departement",
+    "pk": "22222222-2222-2222-2222-222222222209",
+    "fields": { "nom": "Direction des Reabonnements", "code": "DREABO" }
   },
   {
-    "model": "armoires.armoire",
-    "pk": "44444444-4444-4444-4444-444444444402",
-    "fields": { "nom": "Armoire Ressources Humaines", "code": "ARM-RH", "description": "Dossiers personnel", "date_creation": "2025-01-01T00:00:00Z" }
+    "model": "entreprise.departement",
+    "pk": "22222222-2222-2222-2222-222222222210",
+    "fields": { "nom": "Credit Management", "code": "CREDIT-M" }
   },
   {
-    "model": "armoires.armoire",
-    "pk": "44444444-4444-4444-4444-444444444403",
-    "fields": { "nom": "Armoire Direction", "code": "ARM-DG", "description": "Documents direction generale", "date_creation": "2025-01-01T00:00:00Z" }
+    "model": "entreprise.departement",
+    "pk": "22222222-2222-2222-2222-222222222211",
+    "fields": { "nom": "Direction Technique", "code": "DT" }
   },
   {
-    "model": "armoires.armoire",
-    "pk": "44444444-4444-4444-4444-444444444404",
-    "fields": { "nom": "Armoire Informatique", "code": "ARM-IT", "description": "Documentation technique", "date_creation": "2025-01-01T00:00:00Z" }
+    "model": "entreprise.departement",
+    "pk": "22222222-2222-2222-2222-222222222212",
+    "fields": { "nom": "Controleur", "code": "CTRL" }
   },
   {
-    "model": "armoires.rayon",
-    "pk": "55555555-5555-5555-5555-555555555501",
-    "fields": { "armoire": "44444444-4444-4444-4444-444444444401", "nom": "Factures 2024", "code": "R-FACT-2024", "position": "Haut", "date_creation": "2025-01-01T00:00:00Z" }
+    "model": "entreprise.departement",
+    "pk": "22222222-2222-2222-2222-222222222213",
+    "fields": { "nom": "Customer Relation Management", "code": "CRM" }
   },
   {
-    "model": "armoires.rayon",
-    "pk": "55555555-5555-5555-5555-555555555502",
-    "fields": { "armoire": "44444444-4444-4444-4444-444444444401", "nom": "Factures 2025", "code": "R-FACT-2025", "position": "Bas", "date_creation": "2025-01-01T00:00:00Z" }
+    "model": "entreprise.departement",
+    "pk": "22222222-2222-2222-2222-222222222214",
+    "fields": { "nom": "Corporate Sales", "code": "CS" }
   },
   {
-    "model": "armoires.rayon",
-    "pk": "55555555-5555-5555-5555-555555555503",
-    "fields": { "armoire": "44444444-4444-4444-4444-444444444402", "nom": "Contrats travail", "code": "R-CTR-TRAV", "position": "Haut", "date_creation": "2025-01-01T00:00:00Z" }
+    "model": "entreprise.departement",
+    "pk": "22222222-2222-2222-2222-222222222215",
+    "fields": { "nom": "Direction des Ventes", "code": "DV" }
   },
   {
-    "model": "armoires.rayon",
-    "pk": "55555555-5555-5555-5555-555555555504",
-    "fields": { "armoire": "44444444-4444-4444-4444-444444444402", "nom": "Fiches de paie", "code": "R-PAIE", "position": "Bas", "date_creation": "2025-01-01T00:00:00Z" }
+    "model": "entreprise.departement",
+    "pk": "22222222-2222-2222-2222-222222222216",
+    "fields": { "nom": "Comptabilite", "code": "COMPTA" }
   },
-  {
-    "model": "armoires.rayon",
-    "pk": "55555555-5555-5555-5555-555555555505",
-    "fields": { "armoire": "44444444-4444-4444-4444-444444444403", "nom": "Proces-verbaux", "code": "R-PV", "position": "Haut", "date_creation": "2025-01-01T00:00:00Z" }
-  },
-  {
-    "model": "armoires.rayon",
-    "pk": "55555555-5555-5555-5555-555555555506",
-    "fields": { "armoire": "44444444-4444-4444-4444-444444444404", "nom": "Licences logicielles", "code": "R-LIC", "position": "Haut", "date_creation": "2025-01-01T00:00:00Z" }
-  }
+
+  { "model": "entreprise.service", "pk": "33333333-3333-3333-3333-333333333301",
+    "fields": { "departement": "22222222-2222-2222-2222-222222222201", "nom": "Presidence", "code": "PRES" } },
+  { "model": "entreprise.service", "pk": "33333333-3333-3333-3333-333333333302",
+    "fields": { "departement": "22222222-2222-2222-2222-222222222201", "nom": "Assistants Direction", "code": "ASS-DIR" } },
+  { "model": "entreprise.service", "pk": "33333333-3333-3333-3333-333333333303",
+    "fields": { "departement": "22222222-2222-2222-2222-222222222201", "nom": "Projet", "code": "PROJET" } },
+  { "model": "entreprise.service", "pk": "33333333-3333-3333-3333-333333333304",
+    "fields": { "departement": "22222222-2222-2222-2222-222222222203", "nom": "Ressources Humaines", "code": "RH" } },
+  { "model": "entreprise.service", "pk": "33333333-3333-3333-3333-333333333305",
+    "fields": { "departement": "22222222-2222-2222-2222-222222222203", "nom": "Conseil Juridique", "code": "CJ" } },
+  { "model": "entreprise.service", "pk": "33333333-3333-3333-3333-333333333306",
+    "fields": { "departement": "22222222-2222-2222-2222-222222222204", "nom": "Developpement et Maintenance", "code": "DEV" } },
+  { "model": "entreprise.service", "pk": "33333333-3333-3333-3333-333333333307",
+    "fields": { "departement": "22222222-2222-2222-2222-222222222204", "nom": "Systemes et Reseaux", "code": "SYS-RES" } },
+  { "model": "entreprise.service", "pk": "33333333-3333-3333-3333-333333333308",
+    "fields": { "departement": "22222222-2222-2222-2222-222222222204", "nom": "Support Technique", "code": "SUPPORT" } },
+  { "model": "entreprise.service", "pk": "33333333-3333-3333-3333-333333333309",
+    "fields": { "departement": "22222222-2222-2222-2222-222222222205", "nom": "Tresorerie", "code": "TRES" } },
+  { "model": "entreprise.service", "pk": "33333333-3333-3333-3333-333333333310",
+    "fields": { "departement": "22222222-2222-2222-2222-222222222205", "nom": "Controle des Operations Comptables", "code": "DCOH" } },
+  { "model": "entreprise.service", "pk": "33333333-3333-3333-3333-333333333311",
+    "fields": { "departement": "22222222-2222-2222-2222-222222222206", "nom": "Ventes et Distribution", "code": "VENTES" } },
+  { "model": "entreprise.service", "pk": "33333333-3333-3333-3333-333333333312",
+    "fields": { "departement": "22222222-2222-2222-2222-222222222206", "nom": "Call et Activation", "code": "CALL-ACT" } },
+  { "model": "entreprise.service", "pk": "33333333-3333-3333-3333-333333333313",
+    "fields": { "departement": "22222222-2222-2222-2222-222222222206", "nom": "Apporteurs d Affaires", "code": "RAA" } },
+  { "model": "entreprise.service", "pk": "33333333-3333-3333-3333-333333333314",
+    "fields": { "departement": "22222222-2222-2222-2222-222222222207", "nom": "Strategies", "code": "STRAT" } },
+  { "model": "entreprise.service", "pk": "33333333-3333-3333-3333-333333333315",
+    "fields": { "departement": "22222222-2222-2222-2222-222222222207", "nom": "Formation", "code": "FORM" } },
+  { "model": "entreprise.service", "pk": "33333333-3333-3333-3333-333333333316",
+    "fields": { "departement": "22222222-2222-2222-2222-222222222208", "nom": "Logistique Boutiques", "code": "LOG-BQ" } },
+  { "model": "entreprise.service", "pk": "33333333-3333-3333-3333-333333333317",
+    "fields": { "departement": "22222222-2222-2222-2222-222222222208", "nom": "Responsable Boutique", "code": "RBOA" } },
+  { "model": "entreprise.service", "pk": "33333333-3333-3333-3333-333333333318",
+    "fields": { "departement": "22222222-2222-2222-2222-222222222209", "nom": "Reabonnements", "code": "REABO" } },
+  { "model": "entreprise.service", "pk": "33333333-3333-3333-3333-333333333319",
+    "fields": { "departement": "22222222-2222-2222-2222-222222222209", "nom": "Responsable Secteur Reabonnements", "code": "RSY" } },
+  { "model": "entreprise.service", "pk": "33333333-3333-3333-3333-333333333320",
+    "fields": { "departement": "22222222-2222-2222-2222-222222222210", "nom": "Credit Management", "code": "CM" } },
+  { "model": "entreprise.service", "pk": "33333333-3333-3333-3333-333333333321",
+    "fields": { "departement": "22222222-2222-2222-2222-222222222210", "nom": "Assistante Credit", "code": "ASS-CM" } },
+  { "model": "entreprise.service", "pk": "33333333-3333-3333-3333-333333333322",
+    "fields": { "departement": "22222222-2222-2222-2222-222222222211", "nom": "Direction Technique", "code": "DT-TECH" } },
+  { "model": "entreprise.service", "pk": "33333333-3333-3333-3333-333333333323",
+    "fields": { "departement": "22222222-2222-2222-2222-222222222211", "nom": "Service Apres Vente", "code": "SAV" } },
+  { "model": "entreprise.service", "pk": "33333333-3333-3333-3333-333333333324",
+    "fields": { "departement": "22222222-2222-2222-2222-222222222213", "nom": "Departement des Appels et Activations", "code": "DCAA" } },
+  { "model": "entreprise.service", "pk": "33333333-3333-3333-3333-333333333325",
+    "fields": { "departement": "22222222-2222-2222-2222-222222222213", "nom": "Departement du Controle", "code": "DCONTROL" } },
+  { "model": "entreprise.service", "pk": "33333333-3333-3333-3333-333333333326",
+    "fields": { "departement": "22222222-2222-2222-2222-222222222214", "nom": "Corporate Sales", "code": "CS-SVC" } },
+  { "model": "entreprise.service", "pk": "33333333-3333-3333-3333-333333333327",
+    "fields": { "departement": "22222222-2222-2222-2222-222222222215", "nom": "Force de Vente Itinerante", "code": "FVI" } },
+  { "model": "entreprise.service", "pk": "33333333-3333-3333-3333-333333333328",
+    "fields": { "departement": "22222222-2222-2222-2222-222222222215", "nom": "Brand Ambassador", "code": "BA" } },
+  { "model": "entreprise.service", "pk": "33333333-3333-3333-3333-333333333329",
+    "fields": { "departement": "22222222-2222-2222-2222-222222222215", "nom": "Ambassador Manager Senior", "code": "SBM" } },
+  { "model": "entreprise.service", "pk": "33333333-3333-3333-3333-333333333330",
+    "fields": { "departement": "22222222-2222-2222-2222-222222222216", "nom": "Facturation", "code": "FACT" } },
+  { "model": "entreprise.service", "pk": "33333333-3333-3333-3333-333333333331",
+    "fields": { "departement": "22222222-2222-2222-2222-222222222216", "nom": "Tresorerie Comptable", "code": "TRES-C" } },
+
+  { "model": "armoires.armoire", "pk": "44444444-4444-4444-4444-444444444401",
+    "fields": { "nom": "Armoire Direction Generale", "code": "ARM-DG", "description": "Documents de la Direction Generale" } },
+  { "model": "armoires.armoire", "pk": "44444444-4444-4444-4444-444444444402",
+    "fields": { "nom": "Armoire Comptabilite Fiscalite", "code": "ARM-DCF", "description": "Documents comptables et fiscaux" } },
+  { "model": "armoires.armoire", "pk": "44444444-4444-4444-4444-444444444403",
+    "fields": { "nom": "Armoire Ressources Humaines", "code": "ARM-RH", "description": "Dossiers du personnel et contrats" } },
+  { "model": "armoires.armoire", "pk": "44444444-4444-4444-4444-444444444404",
+    "fields": { "nom": "Armoire Systemes d Information", "code": "ARM-DSI", "description": "Documentation technique et licences" } },
+  { "model": "armoires.armoire", "pk": "44444444-4444-4444-4444-444444444405",
+    "fields": { "nom": "Armoire Direction Financiere", "code": "ARM-DFIN", "description": "Documents financiers et budgets" } },
+  { "model": "armoires.armoire", "pk": "44444444-4444-4444-4444-444444444406",
+    "fields": { "nom": "Armoire Direction Commerciale", "code": "ARM-DCO", "description": "Plans commerciaux et rapports de ventes" } },
+  { "model": "armoires.armoire", "pk": "44444444-4444-4444-4444-444444444407",
+    "fields": { "nom": "Armoire Logistique", "code": "ARM-DLOG", "description": "Bons de commande et livraisons" } },
+  { "model": "armoires.armoire", "pk": "44444444-4444-4444-4444-444444444408",
+    "fields": { "nom": "Armoire Reabonnements", "code": "ARM-REABO", "description": "Dossiers reabonnements et suivi clients" } },
+
+  { "model": "armoires.rayon", "pk": "55555555-5555-5555-5555-555555555501",
+    "fields": { "armoire": "44444444-4444-4444-4444-444444444401", "code": "R-DG-PV", "niveau": 1, "description": "PV reunions et decisions" } },
+  { "model": "armoires.rayon", "pk": "55555555-5555-5555-5555-555555555502",
+    "fields": { "armoire": "44444444-4444-4444-4444-444444444401", "code": "R-DG-CTR", "niveau": 2, "description": "Contrats partenaires et conventions" } },
+  { "model": "armoires.rayon", "pk": "55555555-5555-5555-5555-555555555503",
+    "fields": { "armoire": "44444444-4444-4444-4444-444444444402", "code": "R-DCF-F24", "niveau": 1, "description": "Factures exercice 2024" } },
+  { "model": "armoires.rayon", "pk": "55555555-5555-5555-5555-555555555504",
+    "fields": { "armoire": "44444444-4444-4444-4444-444444444402", "code": "R-DCF-F25", "niveau": 2, "description": "Factures exercice 2025" } },
+  { "model": "armoires.rayon", "pk": "55555555-5555-5555-5555-555555555505",
+    "fields": { "armoire": "44444444-4444-4444-4444-444444444402", "code": "R-DCF-EF", "niveau": 3, "description": "Bilans et comptes de resultats" } },
+  { "model": "armoires.rayon", "pk": "55555555-5555-5555-5555-555555555506",
+    "fields": { "armoire": "44444444-4444-4444-4444-444444444403", "code": "R-RH-CTR", "niveau": 1, "description": "Contrats CDI et CDD" } },
+  { "model": "armoires.rayon", "pk": "55555555-5555-5555-5555-555555555507",
+    "fields": { "armoire": "44444444-4444-4444-4444-444444444403", "code": "R-RH-PAIE", "niveau": 2, "description": "Bulletins de salaire mensuels" } },
+  { "model": "armoires.rayon", "pk": "55555555-5555-5555-5555-555555555508",
+    "fields": { "armoire": "44444444-4444-4444-4444-444444444403", "code": "R-RH-STAG", "niveau": 3, "description": "Conventions et rapports de stage" } },
+  { "model": "armoires.rayon", "pk": "55555555-5555-5555-5555-555555555509",
+    "fields": { "armoire": "44444444-4444-4444-4444-444444444404", "code": "R-DSI-LIC", "niveau": 1, "description": "Licences logicielles" } },
+  { "model": "armoires.rayon", "pk": "55555555-5555-5555-5555-555555555510",
+    "fields": { "armoire": "44444444-4444-4444-4444-444444444404", "code": "R-DSI-DOC", "niveau": 2, "description": "Manuels et procedures techniques" } },
+  { "model": "armoires.rayon", "pk": "55555555-5555-5555-5555-555555555511",
+    "fields": { "armoire": "44444444-4444-4444-4444-444444444405", "code": "R-DFIN-BUD", "niveau": 1, "description": "Budgets previsionnels et suivis" } },
+  { "model": "armoires.rayon", "pk": "55555555-5555-5555-5555-555555555512",
+    "fields": { "armoire": "44444444-4444-4444-4444-444444444406", "code": "R-DCO-PAC", "niveau": 1, "description": "Plans d actions ventes et distribution" } },
+  { "model": "armoires.rayon", "pk": "55555555-5555-5555-5555-555555555513",
+    "fields": { "armoire": "44444444-4444-4444-4444-444444444406", "code": "R-DCO-RV", "niveau": 2, "description": "Rapports hebdomadaires et mensuels" } },
+  { "model": "armoires.rayon", "pk": "55555555-5555-5555-5555-555555555514",
+    "fields": { "armoire": "44444444-4444-4444-4444-444444444407", "code": "R-LOG-BC", "niveau": 1, "description": "Bons de commande kits et decodeurs" } },
+  { "model": "armoires.rayon", "pk": "55555555-5555-5555-5555-555555555515",
+    "fields": { "armoire": "44444444-4444-4444-4444-444444444408", "code": "R-REABO-D", "niveau": 1, "description": "Suivi reabonnements clients" } }
 ]
