@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useQuery, useMutation } from 'react-query'
 import { documentsAPI, armoiresAPI } from '../services/api'
 import { toast } from 'react-toastify'
 import { useForm } from 'react-hook-form'
-import { ArrowLeft, Upload, FileText, Tag, ChevronRight, X, Plus } from 'lucide-react'
+import { ArrowLeft, Upload, FileText, Tag, ChevronRight, X, Plus, Lock } from 'lucide-react'
 
 const STEPS = ['Fichier & Localisation', 'Informations', 'Métadonnées']
 
@@ -30,6 +30,13 @@ export default function NouveauDocumentPage() {
     () => armoiresAPI.list().then(r => r.data)
   )
 
+  // Si un rayon est pré-sélectionné via URL, récupérer son armoire pour l'affichage
+  const { data: rayonInfo } = useQuery(
+    ['rayon', defaultRayon],
+    () => armoiresAPI.getRayons(defaultRayon).then(r => r.data?.results?.[0] || r.data),
+    { enabled: !!defaultRayon }
+  )
+
   // Charger les rayons seulement quand on a un vrai UUID d'armoire
   const { data: rayonsData } = useQuery(
     ['rayons', armoireId],
@@ -38,6 +45,13 @@ export default function NouveauDocumentPage() {
   )
 
   const rayons = rayonsData?.results || rayonsData?.rayons || (Array.isArray(rayonsData) ? rayonsData : [])
+
+  // Pré-remplir armoireId si rayon pré-sélectionné
+  useEffect(() => {
+    if (defaultRayon && rayonInfo?.armoire?.id) {
+      setArmoireId(rayonInfo.armoire.id)
+    }
+  }, [defaultRayon, rayonInfo])
 
   const mutation = useMutation(
     (fd) => documentsAPI.create(fd),
@@ -55,15 +69,15 @@ export default function NouveauDocumentPage() {
   )
 
   const onSubmit = (data) => {
-    if (!file)       { toast.error('Sélectionnez un fichier'); return }
-    if (!data.rayon) { toast.error('Sélectionnez un rayon');   return }
+    if (!file)              { toast.error('Sélectionnez un fichier'); return }
+    if (!defaultRayon && !data.rayon) { toast.error('Sélectionnez un rayon');   return }
 
     const fd = new FormData()
     fd.append('fichier',       file)
     fd.append('titre',         data.titre)
     fd.append('type_doc',      data.type_doc)
     fd.append('date_creation', data.date_creation)
-    fd.append('rayon',         data.rayon)
+    fd.append('rayon',         defaultRayon || data.rayon)
     fd.append('statut',        data.statut || 'ACTIF')
     if (data.auteur)        fd.append('metadata.auteur',        data.auteur)
     if (data.destinataire)  fd.append('metadata.destinataire',  data.destinataire)
@@ -159,37 +173,52 @@ export default function NouveauDocumentPage() {
             </div>
 
             {/* Armoire + Rayon */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="label">Armoire *</label>
-                <select
-                  className="input"
-                  value={armoireId}
-                  onChange={e => {
-                    const val = e.target.value
-                    setArmoireId(val)          // ← stocke l'UUID proprement
-                    setValue('rayon', '')      // reset rayon quand armoire change
-                  }}>
-                  <option value="">Sélectionner…</option>
-                  {(armoires?.results || []).map(a => (
-                    <option key={a.id} value={a.id}>{a.nom} ({a.code})</option>
-                  ))}
-                </select>
+            {!defaultRayon ? (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Armoire *</label>
+                  <select
+                    className="input"
+                    value={armoireId}
+                    onChange={e => {
+                      const val = e.target.value
+                      setArmoireId(val)
+                      setValue('rayon', '')
+                    }}>
+                    <option value="">Sélectionner…</option>
+                    {(armoires?.results || []).map(a => (
+                      <option key={a.id} value={a.id}>{a.nom} ({a.code})</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Rayon *</label>
+                  <select
+                    className="input"
+                    disabled={!armoireId}
+                    {...register('rayon', { required: 'Requis' })}>
+                    <option value="">Sélectionner…</option>
+                    {rayons.map(r => (
+                      <option key={r.id} value={r.id}>{r.nom} ({r.code})</option>
+                    ))}
+                  </select>
+                  {errors.rayon && <p className="text-red-500 text-xs mt-1">{errors.rayon.message}</p>}
+                </div>
               </div>
-              <div>
-                <label className="label">Rayon *</label>
-                <select
-                  className="input"
-                  disabled={!armoireId}
-                  {...register('rayon', { required: 'Requis' })}>
-                  <option value="">Sélectionner…</option>
-                  {rayons.map(r => (
-                    <option key={r.id} value={r.id}>{r.nom} ({r.code})</option>
-                  ))}
-                </select>
-                {errors.rayon && <p className="text-red-500 text-xs mt-1">{errors.rayon.message}</p>}
+            ) : (
+              <div className="p-3 rounded-xl" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+                <div className="flex items-center gap-2 text-sm" style={{ color: '#166534' }}>
+                  <Lock size={14} />
+                  <span className="font-medium">Rayon pré-sélectionné :</span>
+                  <span className="font-mono">{rayonInfo?.code}</span>
+                  <span style={{ color: '#86efac' }}>/</span>
+                  <span className="font-mono">{rayonInfo?.armoire?.code}</span>
+                </div>
+                <p className="text-xs mt-1" style={{ color: '#15803d' }}>
+                  Le document sera créé directement dans ce rayon.
+                </p>
               </div>
-            </div>
+            )}
 
             <div className="flex justify-end">
               <button type="button"

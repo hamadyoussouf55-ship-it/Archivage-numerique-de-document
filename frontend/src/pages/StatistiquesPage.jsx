@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { useQuery } from 'react-query'
+import { useQuery, useQueryClient } from 'react-query'
 import { documentsAPI } from '../services/api'
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid
 } from 'recharts'
 import {
-  BarChart2, TrendingUp, Calendar, Download, Filter, RefreshCw
+  BarChart2, TrendingUp, Calendar, Download, Filter, RefreshCw, Loader2
 } from 'lucide-react'
 import { format, subMonths, subDays, startOfMonth } from 'date-fns'
 import { fr } from 'date-fns/locale'
@@ -61,12 +61,14 @@ function TipDoc({ active, payload, label }) {
 }
 
 export default function StatistiquesPage() {
+  const qc = useQueryClient()
   const today = format(new Date(), 'yyyy-MM-dd')
   const [preset,       setPreset]       = useState(5)            // index dans PRESET_RANGES
   const [debut,        setDebut]        = useState(() => format(subMonths(new Date(), 12), 'yyyy-MM-dd'))
   const [fin,          setFin]          = useState(today)
   const [granularite,  setGranularite]  = useState('mois')
   const [customMode,   setCustomMode]   = useState(false)
+  const [refreshing,   setRefreshing]   = useState(false)
 
   const params = { debut, fin, granularite }
 
@@ -75,6 +77,17 @@ export default function StatistiquesPage() {
     () => documentsAPI.getStatsPeriode(params).then(r => r.data),
     { keepPreviousData: true }
   )
+
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    try {
+      // Invalider le cache pour forcer un vrai rafraîchissement
+      await qc.invalidateQueries(['stats-periode', params])
+      await refetch()
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   function applyPreset(idx) {
     const p = PRESET_RANGES[idx]
@@ -112,8 +125,9 @@ export default function StatistiquesPage() {
           </h1>
           <p className="text-sm mt-0.5" style={{ color: '#64748b' }}>Analyse détaillée par période</p>
         </div>
-        <button onClick={() => refetch()} className="btn-secondary flex items-center gap-2">
-          <RefreshCw size={14} /> Actualiser
+        <button onClick={handleRefresh} disabled={refreshing || isLoading} className="btn-secondary flex items-center gap-2">
+          {refreshing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+          Actualiser
         </button>
       </div>
 
