@@ -78,17 +78,23 @@ function CollaborateurModal({ collab, onClose, onSuccess }) {
 
 function OrgModal({ type, item, onClose, onSuccess }) {
   const isEdit = !!item
-  const { register, handleSubmit } = useForm({ defaultValues: item || {} })
+  const { register, handleSubmit, watch } = useForm({ defaultValues: item || {} })
+  const { data: entreprises } = useQuery('entreprises', () => entrepriseAPI.getEntreprises().then(r => r.data), { enabled: type === 'departement' })
   const { data: depts } = useQuery('departements', () => entrepriseAPI.getDepartements().then(r => r.data), { enabled: type === 'service' })
   const mutation = useMutation(
     (data) => type === 'departement' ? (isEdit ? entrepriseAPI.updateDepartement(item.id, data) : entrepriseAPI.createDepartement(data)) : (isEdit ? entrepriseAPI.updateService(item.id, data) : entrepriseAPI.createService(data)),
-    { onSuccess: () => { toast.success(isEdit ? 'Mis à jour !' : 'Créé !'); onSuccess() }, onError: () => toast.error('Erreur') }
+    { onSuccess: () => { toast.success(isEdit ? 'Mis à jour !' : 'Créé !'); onSuccess() }, onError: (e) => toast.error(Object.values(e.response?.data || {}).flat().join(' ') || 'Erreur') }
   )
   return (
     <Modal title={`${isEdit ? 'Modifier' : 'Nouveau'} ${type === 'departement' ? 'département' : 'service'}`} onClose={onClose}>
       <form onSubmit={handleSubmit(d => mutation.mutate(d))} className="space-y-4">
         <div><label className="label">Nom *</label><input className="input" {...register('nom', { required: true })} /></div>
         <div><label className="label">Code *</label><input className="input font-mono uppercase" {...register('code', { required: true })} /></div>
+        {type === 'departement' && (
+          <div><label className="label">Entreprise *</label>
+            <select className="input" {...register('entreprise', { required: true })}><option value="">Sélectionner…</option>{entreprises?.results?.map(e => <option key={e.id} value={e.id}>{e.nom}</option>)}</select>
+          </div>
+        )}
         {type === 'service' && (
           <div><label className="label">Département *</label>
             <select className="input" {...register('departement', { required: true })}><option value="">Sélectionner…</option>{depts?.results?.map(d => <option key={d.id} value={d.id}>{d.nom}</option>)}</select>
@@ -120,6 +126,11 @@ export default function AdminPage() {
     { onSuccess: () => { toast.success('Statut mis à jour'); qc.invalidateQueries('collaborateurs') } })
   const deleteUser = useMutation((id) => authAPI.deleteCollaborateur(id),
     { onSuccess: () => { toast.success('Supprimé'); qc.invalidateQueries('collaborateurs') } })
+
+  const deleteDept = useMutation((id) => entrepriseAPI.deleteDepartement(id),
+    { onSuccess: () => { toast.success('Département supprimé'); qc.invalidateQueries('departements') } })
+  const deleteSvc = useMutation((id) => entrepriseAPI.deleteService(id),
+    { onSuccess: () => { toast.success('Service supprimé'); qc.invalidateQueries('services') } })
 
   const close = () => setModal(null)
   const refresh = () => { close(); qc.invalidateQueries('collaborateurs'); qc.invalidateQueries('departements'); qc.invalidateQueries('services') }
@@ -227,14 +238,20 @@ export default function AdminPage() {
           <div className="card overflow-hidden p-0">
             <table className="w-full text-sm">
               <thead style={{ background: '#f8fafc' }}><tr style={{ borderBottom: '1px solid #e2e8f0' }}>
-                {['Code', 'Nom', 'Services'].map(h => <th key={h} className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>{h}</th>)}
+                {['Code', 'Nom', 'Services', ''].map(h => <th key={h} className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>{h}</th>)}
               </tr></thead>
               <tbody className="divide-y" style={{ borderColor: '#f1f5f9' }}>
                 {depts?.results?.map(d => (
-                  <tr key={d.id} onMouseOver={e => e.currentTarget.style.background = '#f8fafc'} onMouseOut={e => e.currentTarget.style.background = ''}>
+                  <tr key={d.id} className="group" onMouseOver={e => e.currentTarget.style.background = '#f8fafc'} onMouseOut={e => e.currentTarget.style.background = ''}>
                     <td className="px-5 py-3 font-mono text-xs font-semibold" style={{ color: '#2563eb' }}>{d.code}</td>
                     <td className="px-5 py-3 font-semibold" style={{ color: '#1e293b' }}>{d.nom}</td>
                     <td className="px-5 py-3 text-xs" style={{ color: '#64748b' }}>{d.services?.length ?? 0} service(s)</td>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => setModal({ type: 'departement', item: d })} className="p-1.5 rounded hover:bg-blue-50 transition-colors" style={{ color: '#2563eb' }}><Edit2 size={14} /></button>
+                        <button onClick={() => { if (confirm(`Supprimer le département ${d.nom} ?`)) deleteDept.mutate(d.id) }} className="p-1.5 rounded hover:bg-red-50 transition-colors" style={{ color: '#dc2626' }}><Trash2 size={14} /></button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -250,14 +267,20 @@ export default function AdminPage() {
           <div className="card overflow-hidden p-0">
             <table className="w-full text-sm">
               <thead style={{ background: '#f8fafc' }}><tr style={{ borderBottom: '1px solid #e2e8f0' }}>
-                {['Code', 'Nom', 'Département'].map(h => <th key={h} className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>{h}</th>)}
+                {['Code', 'Nom', 'Département', ''].map(h => <th key={h} className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>{h}</th>)}
               </tr></thead>
               <tbody className="divide-y" style={{ borderColor: '#f1f5f9' }}>
                 {services?.results?.map(s => (
-                  <tr key={s.id} onMouseOver={e => e.currentTarget.style.background = '#f8fafc'} onMouseOut={e => e.currentTarget.style.background = ''}>
+                  <tr key={s.id} className="group" onMouseOver={e => e.currentTarget.style.background = '#f8fafc'} onMouseOut={e => e.currentTarget.style.background = ''}>
                     <td className="px-5 py-3 font-mono text-xs font-semibold" style={{ color: '#2563eb' }}>{s.code}</td>
                     <td className="px-5 py-3 font-semibold" style={{ color: '#1e293b' }}>{s.nom}</td>
                     <td className="px-5 py-3 text-xs" style={{ color: '#64748b' }}>{s.departement_nom || '—'}</td>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => setModal({ type: 'service', item: s })} className="p-1.5 rounded hover:bg-blue-50 transition-colors" style={{ color: '#2563eb' }}><Edit2 size={14} /></button>
+                        <button onClick={() => { if (confirm(`Supprimer le service ${s.nom} ?`)) deleteSvc.mutate(s.id) }} className="p-1.5 rounded hover:bg-red-50 transition-colors" style={{ color: '#dc2626' }}><Trash2 size={14} /></button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>

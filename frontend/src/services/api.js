@@ -94,10 +94,15 @@ export const authAPI = {
 
 // ── Entreprise ────────────────────────────────────────────────────────────────
 export const entrepriseAPI = {
+  getEntreprises:      (params)    => api.get('/entreprise/', { params }),
   getDepartements:     (params)    => api.get('/entreprise/departements/', { params }),
   createDepartement:   (data)      => api.post('/entreprise/departements/', data),
+  updateDepartement:   (id, data)  => api.patch(`/entreprise/departements/${id}/`, data),
+  deleteDepartement:   (id)        => api.delete(`/entreprise/departements/${id}/`),
   getServices:         (params)    => api.get('/entreprise/services/', { params }),
   createService:       (data)      => api.post('/entreprise/services/', data),
+  updateService:       (id, data)  => api.patch(`/entreprise/services/${id}/`, data),
+  deleteService:       (id)        => api.delete(`/entreprise/services/${id}/`),
 }
 
 // ── Armoires ──────────────────────────────────────────────────────────────────
