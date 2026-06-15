@@ -6,6 +6,7 @@ from .version_views import DocumentVersionsView, VersionDetailView
 urlpatterns = [
     # Liste & création
     path('',                   views.DocumentListCreateView.as_view(), name='document-list'),
+    path('types/',             views.DocumentTypesView.as_view(),       name='document-types'),
 
     # Stats
     path('stats/',             views.DashboardStatsView.as_view(),     name='dashboard-stats'),

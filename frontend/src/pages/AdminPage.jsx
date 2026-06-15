@@ -1,12 +1,17 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from 'react-query'
-import { authAPI, entrepriseAPI } from '../services/api'
+import { authAPI, entrepriseAPI, armoiresAPI } from '../services/api'
 import { toast } from 'react-toastify'
 import { useForm } from 'react-hook-form'
-import { Users, Plus, Search, Shield, Edit2, Trash2, X, Check, UserCheck, UserX, Building2, Layers } from 'lucide-react'
+import { Users, Plus, Search, Shield, Edit2, Trash2, X, Check, UserCheck, UserX, Building2, Layers, Archive } from 'lucide-react'
 
 const ROLE_BADGE = { ADMIN: 'badge-blue', ARCHIVISTE: 'badge-green', CONSULTANT: 'badge-gray' }
-const TABS = [{ id: 'users', label: 'Utilisateurs', icon: Users }, { id: 'depts', label: 'Départements', icon: Building2 }, { id: 'services', label: 'Services', icon: Layers }]
+const TABS = [
+  { id: 'users', label: 'Utilisateurs', icon: Users },
+  { id: 'depts', label: 'Départements', icon: Building2 },
+  { id: 'services', label: 'Services', icon: Layers },
+  { id: 'armoires', label: 'Armoires', icon: Archive },
+]
 
 function Modal({ title, onClose, children }) {
   return (
@@ -80,7 +85,8 @@ function OrgModal({ type, item, onClose, onSuccess }) {
   const isEdit = !!item
   const { register, handleSubmit, watch } = useForm({ defaultValues: item || {} })
   const { data: entreprises } = useQuery('entreprises', () => entrepriseAPI.getEntreprises().then(r => r.data), { enabled: type === 'departement' })
-  const { data: depts } = useQuery('departements', () => entrepriseAPI.getDepartements().then(r => r.data), { enabled: type === 'service' })
+  const { data: depts } = useQuery('departements', () => entrepriseAPI.getDepartements().then(r => r.data), { enabled: type === 'service' || type === 'armoire' })
+  const { data: services } = useQuery('services', () => entrepriseAPI.getServices().then(r => r.data), { enabled: type === 'armoire' })
   const mutation = useMutation(
     (data) => type === 'departement' ? (isEdit ? entrepriseAPI.updateDepartement(item.id, data) : entrepriseAPI.createDepartement(data)) : (isEdit ? entrepriseAPI.updateService(item.id, data) : entrepriseAPI.createService(data)),
     { onSuccess: () => { toast.success(isEdit ? 'Mis à jour !' : 'Créé !'); onSuccess() }, onError: (e) => toast.error(Object.values(e.response?.data || {}).flat().join(' ') || 'Erreur') }
@@ -111,6 +117,35 @@ function OrgModal({ type, item, onClose, onSuccess }) {
   )
 }
 
+function ArmoireModal({ item, onClose, onSuccess }) {
+  const isEdit = !!item
+  const { register, handleSubmit, watch } = useForm({ defaultValues: item || {} })
+  const { data: depts } = useQuery('departements', () => entrepriseAPI.getDepartements().then(r => r.data))
+  const { data: services } = useQuery('services', () => entrepriseAPI.getServices().then(r => r.data))
+  const mutation = useMutation(
+    (data) => isEdit ? armoiresAPI.update(item.id, data) : armoiresAPI.create(data),
+    { onSuccess: () => { toast.success(isEdit ? 'Mis à jour !' : 'Créé !'); onSuccess() }, onError: (e) => toast.error(Object.values(e.response?.data || {}).flat().join(' ') || 'Erreur') }
+  )
+  return (
+    <Modal title={`${isEdit ? 'Modifier' : 'Nouvelle'} armoire`} onClose={onClose}>
+      <form onSubmit={handleSubmit(d => mutation.mutate(d))} className="space-y-4">
+        <div><label className="label">Nom *</label><input className="input" {...register('nom', { required: true })} /></div>
+        <div><label className="label">Code *</label><input className="input font-mono uppercase" {...register('code', { required: true })} /></div>
+        <div><label className="label">Description</label><textarea className="input" {...register('description')} rows={3} /></div>
+        <div><label className="label">Service *</label>
+          <select className="input" {...register('service', { required: true })}><option value="">Sélectionner…</option>{services?.results?.map(s => <option key={s.id} value={s.id}>{s.departement_code} - {s.nom} ({s.code})</option>)}</select>
+        </div>
+        <div className="flex gap-3">
+          <button type="button" onClick={onClose} className="btn-secondary flex-1 justify-center">Annuler</button>
+          <button type="submit" disabled={mutation.isLoading} className="btn-primary flex-1 justify-center">
+            {mutation.isLoading ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <><Check size={14} /> {isEdit ? 'Enregistrer' : 'Créer'}</>}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
 export default function AdminPage() {
   const qc = useQueryClient()
   const [tab, setTab]       = useState('users')
@@ -118,9 +153,10 @@ export default function AdminPage() {
   const [role, setRole]     = useState('')
   const [modal, setModal]   = useState(null)
 
-  const { data: users }    = useQuery(['collaborateurs', search, role], () => authAPI.getCollaborateurs({ search, ...(role && { role }) }).then(r => r.data))
-  const { data: depts }    = useQuery('departements', () => entrepriseAPI.getDepartements().then(r => r.data))
-  const { data: services } = useQuery('services',     () => entrepriseAPI.getServices().then(r => r.data))
+  const { data: users }     = useQuery(['collaborateurs', search, role], () => authAPI.getCollaborateurs({ search, ...(role && { role }) }).then(r => r.data))
+  const { data: depts }     = useQuery('departements', () => entrepriseAPI.getDepartements().then(r => r.data))
+  const { data: services }  = useQuery('services',     () => entrepriseAPI.getServices().then(r => r.data))
+  const { data: armoires }  = useQuery('armoires',     () => armoiresAPI.list().then(r => r.data))
 
   const toggleActive = useMutation(({ id, is_active }) => authAPI.updateCollaborateur(id, { is_active }),
     { onSuccess: () => { toast.success('Statut mis à jour'); qc.invalidateQueries('collaborateurs') } })
@@ -131,14 +167,17 @@ export default function AdminPage() {
     { onSuccess: () => { toast.success('Département supprimé'); qc.invalidateQueries('departements') } })
   const deleteSvc = useMutation((id) => entrepriseAPI.deleteService(id),
     { onSuccess: () => { toast.success('Service supprimé'); qc.invalidateQueries('services') } })
+  const deleteArmoire = useMutation((id) => armoiresAPI.delete(id),
+    { onSuccess: () => { toast.success('Armoire supprimée'); qc.invalidateQueries('armoires') } })
 
   const close = () => setModal(null)
-  const refresh = () => { close(); qc.invalidateQueries('collaborateurs'); qc.invalidateQueries('departements'); qc.invalidateQueries('services') }
+  const refresh = () => { close(); qc.invalidateQueries('collaborateurs'); qc.invalidateQueries('departements'); qc.invalidateQueries('services'); qc.invalidateQueries('armoires') }
 
   return (
     <div className="p-6 space-y-5">
       {modal?.type === 'user' && <CollaborateurModal collab={modal.item} onClose={close} onSuccess={refresh} />}
       {(modal?.type === 'departement' || modal?.type === 'service') && <OrgModal type={modal.type} item={modal.item} onClose={close} onSuccess={refresh} />}
+      {modal?.type === 'armoire' && <ArmoireModal item={modal.item} onClose={close} onSuccess={refresh} />}
 
       <div>
         <h1 className="page-title flex items-center gap-2"><Shield size={20} style={{ color: '#2563eb' }} /> Administration</h1>
@@ -279,6 +318,37 @@ export default function AdminPage() {
                       <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button onClick={() => setModal({ type: 'service', item: s })} className="p-1.5 rounded hover:bg-blue-50 transition-colors" style={{ color: '#2563eb' }}><Edit2 size={14} /></button>
                         <button onClick={() => { if (confirm(`Supprimer le service ${s.nom} ?`)) deleteSvc.mutate(s.id) }} className="p-1.5 rounded hover:bg-red-50 transition-colors" style={{ color: '#dc2626' }}><Trash2 size={14} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      {/* Armoires */}
+      {tab === 'armoires' && (
+        <>
+          <div className="flex justify-end"><button onClick={() => setModal({ type: 'armoire' })} className="btn-primary"><Plus size={15} /> Nouvelle armoire</button></div>
+          <div className="card overflow-hidden p-0">
+            <table className="w-full text-sm">
+              <thead style={{ background: '#f8fafc' }}><tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                {['Code', 'Nom', 'Département', 'Service', 'Rayons', ''].map(h => <th key={h} className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>{h}</th>)}
+              </tr></thead>
+              <tbody className="divide-y" style={{ borderColor: '#f1f5f9' }}>
+                {armoires?.results?.map(a => (
+                  <tr key={a.id} className="group" onMouseOver={e => e.currentTarget.style.background = '#f8fafc'} onMouseOut={e => e.currentTarget.style.background = ''}>
+                    <td className="px-5 py-3 font-mono text-xs font-semibold" style={{ color: '#2563eb' }}>{a.code}</td>
+                    <td className="px-5 py-3 font-semibold" style={{ color: '#1e293b' }}>{a.nom}</td>
+                    <td className="px-5 py-3 text-xs" style={{ color: '#64748b' }}>{a.departement_code ? `${a.departement_code} - ${a.departement_nom}` : '—'}</td>
+                    <td className="px-5 py-3 text-xs" style={{ color: '#64748b' }}>{a.service_code ? `${a.service_code} - ${a.service_nom}` : '—'}</td>
+                    <td className="px-5 py-3 text-xs" style={{ color: '#64748b' }}>{a.nombre_rayons ?? 0} rayon(s)</td>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => setModal({ type: 'armoire', item: a })} className="p-1.5 rounded hover:bg-blue-50 transition-colors" style={{ color: '#2563eb' }}><Edit2 size={14} /></button>
+                        <button onClick={() => { if (confirm(`Supprimer l'armoire ${a.nom} ?`)) deleteArmoire.mutate(a.id) }} className="p-1.5 rounded hover:bg-red-50 transition-colors" style={{ color: '#dc2626' }}><Trash2 size={14} /></button>
                       </div>
                     </td>
                   </tr>

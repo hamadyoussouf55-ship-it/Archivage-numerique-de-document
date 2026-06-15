@@ -488,3 +488,17 @@ class DocumentSharePublicDownloadView(APIView):
             as_attachment=True,
             filename=share.document.nom_fichier
         )
+
+
+class DocumentTypesView(APIView):
+    """Retourne la liste des types de documents distincts existants."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        types = (
+            Document.objects.exclude(statut='SUPPRIME')
+            .values_list('type_doc', flat=True)
+            .distinct()
+            .order_by('type_doc')
+        )
+        return Response([t for t in types if t])

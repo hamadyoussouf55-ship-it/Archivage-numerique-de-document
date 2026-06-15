@@ -34,10 +34,10 @@ export default function LoginPage() {
         </p>
         <div className="space-y-3 w-full max-w-xs">
           {[
-            ['🗂️', 'Gestion des armoires et rayons'],
-            ['📄', 'Codification automatique des documents'],
-            ['🔒', 'Accès sécurisé par rôle'],
-            ['📊', 'Traçabilité complète des actions'],
+            ['', 'Gestion des armoires et rayons'],
+            ['', 'Codification automatique des documents'],
+            ['', 'Accès sécurisé par rôle'],
+            ['', 'Traçabilité complète des actions'],
           ].map(([icon, text]) => (
             <div key={text} className="flex items-center gap-3 px-4 py-2.5 rounded-xl"
                  style={{ background: 'rgba(255,255,255,0.08)' }}>

@@ -100,6 +100,7 @@ export const entrepriseAPI = {
   updateDepartement:   (id, data)  => api.patch(`/entreprise/departements/${id}/`, data),
   deleteDepartement:   (id)        => api.delete(`/entreprise/departements/${id}/`),
   getServices:         (params)    => api.get('/entreprise/services/', { params }),
+  getService:          (id)        => api.get(`/entreprise/services/${id}/`),
   createService:       (data)      => api.post('/entreprise/services/', data),
   updateService:       (id, data)  => api.patch(`/entreprise/services/${id}/`, data),
   deleteService:       (id)        => api.delete(`/entreprise/services/${id}/`),
@@ -113,6 +114,7 @@ export const armoiresAPI = {
   update:       (id, data)  => api.patch(`/armoires/${id}/`, data),
   delete:       (id)        => api.delete(`/armoires/${id}/`),
   getRayons:    (id)        => api.get(`/armoires/${id}/rayons/`),
+  getRayon:     (id)        => api.get(`/armoires/rayons/${id}/`),
   createRayon:  (id, data)  => api.post(`/armoires/${id}/rayons/`, data),
   deleteRayon:  (id)        => api.delete(`/armoires/rayons/${id}/`),
 }
@@ -120,6 +122,7 @@ export const armoiresAPI = {
 // ── Documents ─────────────────────────────────────────────────────────────────
 export const documentsAPI = {
   list:         (params)    => api.get('/documents/', { params }),
+  getTypes:     ()          => api.get('/documents/types/'),
   get:          (id)        => api.get(`/documents/${id}/`),
   create:       (data)      => api.post('/documents/', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
   update:       (id, data)  => api.patch(`/documents/${id}/`, data),

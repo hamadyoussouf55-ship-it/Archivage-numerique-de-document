@@ -7,8 +7,9 @@ from apps.accounts.permissions import IsAdmin, IsAdminOrArchiviste
 
 
 class ArmoireListCreateView(generics.ListCreateAPIView):
-    queryset        = Armoire.objects.prefetch_related('rayons').all()
-    filter_backends = [SearchFilter]
+    queryset        = Armoire.objects.select_related('service', 'service__departement').prefetch_related('rayons').all()
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    filterset_fields = ['service', 'service__departement']
     search_fields   = ['nom', 'code']
 
     def get_serializer_class(self):
@@ -19,7 +20,7 @@ class ArmoireListCreateView(generics.ListCreateAPIView):
 
 
 class ArmoireDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset         = Armoire.objects.prefetch_related('rayons').all()
+    queryset         = Armoire.objects.select_related('service', 'service__departement').prefetch_related('rayons').all()
     serializer_class = ArmoireSerializer
 
     def get_permissions(self):
@@ -34,7 +35,7 @@ class RayonParArmoireView(generics.ListCreateAPIView):
     serializer_class = RayonSerializer
 
     def get_queryset(self):
-        return Rayon.objects.filter(armoire=self.kwargs['pk']).select_related('armoire')
+        return Rayon.objects.filter(armoire=self.kwargs['pk']).select_related('armoire', 'armoire__service', 'armoire__service__departement')
 
     def get_permissions(self):
         return [IsAdminOrArchiviste()] if self.request.method == 'POST' else [permissions.IsAuthenticated()]
@@ -45,10 +46,10 @@ class RayonParArmoireView(generics.ListCreateAPIView):
 
 
 class RayonListCreateView(generics.ListCreateAPIView):
-    queryset         = Rayon.objects.select_related('armoire').all()
+    queryset         = Rayon.objects.select_related('armoire', 'armoire__service', 'armoire__service__departement').all()
     serializer_class = RayonSerializer
     filter_backends  = [DjangoFilterBackend, SearchFilter]
-    filterset_fields = ['armoire']
+    filterset_fields = ['armoire', 'armoire__service', 'armoire__service__departement']
     search_fields    = ['nom', 'code']
 
     def get_permissions(self):
@@ -56,7 +57,7 @@ class RayonListCreateView(generics.ListCreateAPIView):
 
 
 class RayonDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset         = Rayon.objects.select_related('armoire').all()
+    queryset         = Rayon.objects.select_related('armoire', 'armoire__service', 'armoire__service__departement').all()
     serializer_class = RayonSerializer
 
     def get_permissions(self):

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useQuery, useMutation } from 'react-query'
-import { documentsAPI, armoiresAPI } from '../services/api'
+import { documentsAPI, armoiresAPI, entrepriseAPI } from '../services/api'
 import { toast } from 'react-toastify'
 import { useForm } from 'react-hook-form'
 import { ArrowLeft, Upload, FileText, Tag, ChevronRight, X, Plus, Lock } from 'lucide-react'
@@ -18,40 +18,87 @@ export default function NouveauDocumentPage() {
   const [dragOver,  setDragOver]  = useState(false)
   const [motsCles,  setMotsCles]  = useState([])
   const [motCle,    setMotCle]    = useState('')
-  const [armoireId, setArmoireId] = useState('')   // ← ID string propre
+
+  // Cascade IDs
+  const [departementId, setDepartementId] = useState('')
+  const [serviceId,     setServiceId]     = useState('')
+  const [armoireId,     setArmoireId]     = useState('')
+
+  // Pré-sélection via ?rayon=
+  const [preselect, setPreselect] = useState({})
 
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm({
     defaultValues: { rayon: defaultRayon, statut: 'ACTIF' }
   })
 
-  // Charger les armoires
-  const { data: armoires } = useQuery(
-    'armoires-list',
-    () => armoiresAPI.list().then(r => r.data)
-  )
+  // ── Départements ──
+  const { data: depts } = useQuery('departements',
+    () => entrepriseAPI.getDepartements().then(r => r.data))
 
-  // Si un rayon est pré-sélectionné via URL, récupérer son armoire pour l'affichage
-  const { data: rayonInfo } = useQuery(
-    ['rayon', defaultRayon],
-    () => armoiresAPI.getRayons(defaultRayon).then(r => r.data?.results?.[0] || r.data),
-    { enabled: !!defaultRayon }
+  // ── Services filtrés par département ──
+  const { data: servicesData } = useQuery(
+    ['services-filtre', departementId],
+    () => entrepriseAPI.getServices({ departement: departementId }).then(r => r.data),
+    { enabled: !!departementId }
   )
+  const services = servicesData?.results || []
 
-  // Charger les rayons seulement quand on a un vrai UUID d'armoire
+  // ── Armoires filtrées par service ──
+  const { data: armoiresData } = useQuery(
+    ['armoires-filtre', serviceId],
+    () => armoiresAPI.list({ service: serviceId }).then(r => r.data),
+    { enabled: !!serviceId }
+  )
+  const armoires = armoiresData?.results || []
+
+  // ── Rayons filtrés par armoire ──
   const { data: rayonsData } = useQuery(
     ['rayons', armoireId],
     () => armoiresAPI.getRayons(armoireId).then(r => r.data),
     { enabled: !!armoireId }
   )
-
   const rayons = rayonsData?.results || rayonsData?.rayons || (Array.isArray(rayonsData) ? rayonsData : [])
 
-  // Pré-remplir armoireId si rayon pré-sélectionné
+  const DOC_TYPES = ['CONTRAT', 'FACTURE', 'RAPPORT', 'COURRIER', 'AUTRE']
+  const [typeAutre, setTypeAutre] = useState('')
+
+  // ── Pré-sélection via ?rayon= ──
+  const { data: rayonDetail } = useQuery(
+    ['rayon-detail', defaultRayon],
+    () => armoiresAPI.getRayon(defaultRayon).then(r => r.data),
+    { enabled: !!defaultRayon }
+  )
+
+  const { data: armoireDetail } = useQuery(
+    ['armoire-detail', rayonDetail?.armoire],
+    () => armoiresAPI.get(rayonDetail.armoire).then(r => r.data),
+    { enabled: !!rayonDetail?.armoire }
+  )
+
+  const { data: serviceDetail } = useQuery(
+    ['service-detail', armoireDetail?.service],
+    () => entrepriseAPI.getService(armoireDetail.service).then(r => r.data),
+    { enabled: !!armoireDetail?.service }
+  )
+
   useEffect(() => {
-    if (defaultRayon && rayonInfo?.armoire?.id) {
-      setArmoireId(rayonInfo.armoire.id)
+    if (rayonDetail && armoireDetail && serviceDetail) {
+      setPreselect({
+        departement: serviceDetail.departement,
+        departementNom: rayonDetail.departement_nom,
+        service: armoireDetail.service,
+        serviceNom: armoireDetail.service_nom,
+        armoire: rayonDetail.armoire,
+        armoireNom: armoireDetail.nom,
+        rayon: defaultRayon,
+        rayonNom: rayonDetail.nom,
+      })
+      setDepartementId(serviceDetail.departement)
+      setServiceId(armoireDetail.service)
+      setArmoireId(rayonDetail.armoire)
+      setValue('rayon', defaultRayon)
     }
-  }, [defaultRayon, rayonInfo])
+  }, [rayonDetail, armoireDetail, serviceDetail, defaultRayon, setValue])
 
   const mutation = useMutation(
     (fd) => documentsAPI.create(fd),
@@ -69,18 +116,17 @@ export default function NouveauDocumentPage() {
   )
 
   const onSubmit = (data) => {
-    if (!file)              { toast.error('Sélectionnez un fichier'); return }
-    if (!defaultRayon && !data.rayon) { toast.error('Sélectionnez un rayon');   return }
+    if (!file) { toast.error('Sélectionnez un fichier'); return }
+    const rayonFinal = preselect.rayon || data.rayon
+    if (!rayonFinal) { toast.error('Sélectionnez un rayon'); return }
+    if (data.type_doc === 'AUTRE' && !typeAutre.trim()) { toast.error('Précisez le type du document'); return }
 
     const fd = new FormData()
     fd.append('fichier',       file)
     fd.append('titre',         data.titre)
-    fd.append('type_doc',      data.type_doc)
-    fd.append('date_creation', data.date_creation)
-    fd.append('rayon',         defaultRayon || data.rayon)
+    fd.append('type_doc',      data.type_doc === 'AUTRE' ? typeAutre.trim() : data.type_doc)
+    fd.append('rayon',         rayonFinal)
     fd.append('statut',        data.statut || 'ACTIF')
-    if (data.auteur)        fd.append('metadata.auteur',        data.auteur)
-    if (data.destinataire)  fd.append('metadata.destinataire',  data.destinataire)
     if (data.description)   fd.append('metadata.description',   data.description)
     if (data.date_emission) fd.append('metadata.date_emission',  data.date_emission)
     if (motsCles.length)    fd.append('metadata.mots_cles',     JSON.stringify(motsCles))
@@ -172,57 +218,94 @@ export default function NouveauDocumentPage() {
               </div>
             </div>
 
-            {/* Armoire + Rayon */}
-            {!defaultRayon ? (
-              <div className="grid grid-cols-2 gap-4">
+            {/* Localisation : cascade Département → Service → Armoire → Rayon */}
+            {preselect.rayon ? (
+              <div className="p-3 rounded-xl" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+                <div className="flex items-center gap-2 text-sm flex-wrap" style={{ color: '#166534' }}>
+                  <Lock size={14} />
+                  <span className="font-medium">Emplacement :</span>
+                  <span>{preselect.departementNom}</span><ChevronRight size={12} />
+                  <span>{preselect.serviceNom}</span><ChevronRight size={12} />
+                  <span>{preselect.armoireNom}</span><ChevronRight size={12} />
+                  <span className="font-mono">{preselect.rayonNom}</span>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Département */}
                 <div>
-                  <label className="label">Armoire *</label>
-                  <select
-                    className="input"
-                    value={armoireId}
+                  <label className="label">Département *</label>
+                  <select className="input" value={departementId}
                     onChange={e => {
-                      const val = e.target.value
-                      setArmoireId(val)
+                      setDepartementId(e.target.value)
+                      setServiceId('')
+                      setArmoireId('')
                       setValue('rayon', '')
                     }}>
-                    <option value="">Sélectionner…</option>
-                    {(armoires?.results || []).map(a => (
+                    <option value="">Sélectionner le département…</option>
+                    {(depts?.results || []).map(d => (
+                      <option key={d.id} value={d.id}>{d.code} - {d.nom}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Service */}
+                <div>
+                  <label className="label">Service *</label>
+                  <select className="input" value={serviceId}
+                    disabled={!departementId}
+                    onChange={e => {
+                      setServiceId(e.target.value)
+                      setArmoireId('')
+                      setValue('rayon', '')
+                    }}>
+                    <option value="">Sélectionner le service…</option>
+                    {services.map(s => (
+                      <option key={s.id} value={s.id}>{s.code} - {s.nom}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Armoire */}
+                <div>
+                  <label className="label">Armoire *</label>
+                  <select className="input" value={armoireId}
+                    disabled={!serviceId}
+                    onChange={e => {
+                      setArmoireId(e.target.value)
+                      setValue('rayon', '')
+                    }}>
+                    <option value="">Sélectionner l'armoire…</option>
+                    {armoires.map(a => (
                       <option key={a.id} value={a.id}>{a.nom} ({a.code})</option>
                     ))}
                   </select>
                 </div>
+
+                {/* Rayon */}
                 <div>
                   <label className="label">Rayon *</label>
-                  <select
-                    className="input"
+                  <select className="input"
                     disabled={!armoireId}
                     {...register('rayon', { required: 'Requis' })}>
-                    <option value="">Sélectionner…</option>
+                    <option value="">Sélectionner le rayon…</option>
                     {rayons.map(r => (
                       <option key={r.id} value={r.id}>{r.nom} ({r.code})</option>
                     ))}
                   </select>
                   {errors.rayon && <p className="text-red-500 text-xs mt-1">{errors.rayon.message}</p>}
                 </div>
-              </div>
-            ) : (
-              <div className="p-3 rounded-xl" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
-                <div className="flex items-center gap-2 text-sm" style={{ color: '#166534' }}>
-                  <Lock size={14} />
-                  <span className="font-medium">Rayon pré-sélectionné :</span>
-                  <span className="font-mono">{rayonInfo?.code}</span>
-                  <span style={{ color: '#86efac' }}>/</span>
-                  <span className="font-mono">{rayonInfo?.armoire?.code}</span>
-                </div>
-                <p className="text-xs mt-1" style={{ color: '#15803d' }}>
-                  Le document sera créé directement dans ce rayon.
-                </p>
-              </div>
+              </>
             )}
 
             <div className="flex justify-end">
               <button type="button"
-                      onClick={() => { if (!file) { toast.error('Sélectionnez un fichier'); return } setStep(1) }}
+                      onClick={() => {
+                        if (!file) { toast.error('Sélectionnez un fichier'); return }
+                        const r = preselect.rayon || watch('rayon')
+                        if (!r) { toast.error('Sélectionnez un rayon'); return }
+                        setStep(1)
+                      }}
                       className="btn-primary flex items-center gap-2">
                 Suivant <ChevronRight size={16} />
               </button>
@@ -239,19 +322,24 @@ export default function NouveauDocumentPage() {
                      {...register('titre', { required: 'Requis' })} />
               {errors.titre && <p className="text-red-500 text-xs mt-1">{errors.titre.message}</p>}
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="label">Type *</label>
-                <input className="input" placeholder="Ex: Contrat, Facture…"
-                       {...register('type_doc', { required: 'Requis' })} />
-                {errors.type_doc && <p className="text-red-500 text-xs mt-1">{errors.type_doc.message}</p>}
-              </div>
-              <div>
-                <label className="label">Date du document *</label>
-                <input type="date" className="input" {...register('date_creation', { required: 'Requis' })} />
-                {errors.date_creation && <p className="text-red-500 text-xs mt-1">{errors.date_creation.message}</p>}
-              </div>
+            <div>
+              <label className="label">Type *</label>
+              <select className="input" {...register('type_doc', { required: 'Requis' })}
+                onChange={e => { if (e.target.value !== 'AUTRE') setTypeAutre('') }}>
+                <option value="">Sélectionner le type…</option>
+                {DOC_TYPES.map(t => (
+                  <option key={t} value={t}>{t.charAt(0) + t.slice(1).toLowerCase()}</option>
+                ))}
+              </select>
+              {errors.type_doc && <p className="text-red-500 text-xs mt-1">{errors.type_doc.message}</p>}
             </div>
+            {watch('type_doc') === 'AUTRE' && (
+              <div>
+                <label className="label">Précisez le type *</label>
+                <input className="input" placeholder="Ex: Devis, Avenant…"
+                       value={typeAutre} onChange={e => setTypeAutre(e.target.value)} />
+              </div>
+            )}
             <div>
               <label className="label">Statut</label>
               <select className="input" {...register('statut')}>
@@ -273,10 +361,6 @@ export default function NouveauDocumentPage() {
         {/* ── Étape 2 : Métadonnées ── */}
         {step === 2 && (
           <div className="card space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div><label className="label">Auteur</label><input className="input" {...register('auteur')} /></div>
-              <div><label className="label">Destinataire</label><input className="input" {...register('destinataire')} /></div>
-            </div>
             <div>
               <label className="label">Date d'émission</label>
               <input type="date" className="input" {...register('date_emission')} />

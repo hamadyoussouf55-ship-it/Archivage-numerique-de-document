@@ -1,3 +1,4 @@
+from django.utils import timezone
 from rest_framework import serializers
 from .models import Document, MetadataDocument, VersionDocument, DocumentShare
 
@@ -69,6 +70,7 @@ class DocumentSerializer(serializers.ModelSerializer):
 
 class DocumentCreateSerializer(serializers.ModelSerializer):
     metadata = MetadataDocumentSerializer(required=False)
+    date_creation = serializers.DateField(required=False)
 
     class Meta:
         model  = Document
@@ -77,6 +79,8 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         metadata_data = validated_data.pop('metadata', None)
+        if 'date_creation' not in validated_data or not validated_data['date_creation']:
+            validated_data['date_creation'] = timezone.now().date()
         request  = self.context.get('request')
         document = Document.objects.create(
             createur=request.user if request else None,

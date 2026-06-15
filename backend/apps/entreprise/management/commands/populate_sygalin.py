@@ -64,67 +64,67 @@ SERVICES = [
     ("COMPTA",   "Tresorerie Comptable",                "TRES-C"),
 ]
 
-# (nom_armoire, code_armoire, description, [(nom_rayon, code_rayon, position), ...])
+# (nom_armoire, code_armoire, description, code_service, [(nom_rayon, code_rayon, position), ...])
 ARMOIRES = [
     ("Armoire Direction Generale", "ARM-DG",
-     "Documents Direction Generale et Conseil Juridique", [
-        ("Proces-verbaux et decisions",    "R-DG-PV",  1),
-        ("Contrats et conventions",        "R-DG-CTR", 2),
-        ("Courriers et correspondances",   "R-DG-CR",  3),
-    ]),
+     "Documents Direction Generale et Conseil Juridique", "PRES", [
+         ("Proces-verbaux et decisions",    "R-DG-PV",  1),
+         ("Contrats et conventions",        "R-DG-CTR", 2),
+         ("Courriers et correspondances",   "R-DG-CR",  3),
+     ]),
     ("Armoire Comptabilite Fiscalite", "ARM-DCF",
-     "Documents comptables et fiscaux", [
-        ("Factures exercice 2024",         "R-DCF-F24",  1),
-        ("Factures exercice 2025",         "R-DCF-F25",  2),
-        ("Etats financiers et bilans",     "R-DCF-EF",   3),
-        ("Declarations fiscales",          "R-DCF-DECL", 4),
-    ]),
+     "Documents comptables et fiscaux", "FACT", [
+         ("Factures exercice 2024",         "R-DCF-F24",  1),
+         ("Factures exercice 2025",         "R-DCF-F25",  2),
+         ("Etats financiers et bilans",     "R-DCF-EF",   3),
+         ("Declarations fiscales",          "R-DCF-DECL", 4),
+     ]),
     ("Armoire Ressources Humaines", "ARM-RH",
-     "Dossiers du personnel et contrats", [
-        ("Contrats de travail CDI CDD",    "R-RH-CTR",  1),
-        ("Bulletins de salaire",           "R-RH-PAIE", 2),
-        ("Conventions et rapports stage",  "R-RH-STAG", 3),
-        ("Documents de formation",         "R-RH-FORM", 4),
-    ]),
+     "Dossiers du personnel et contrats", "RH", [
+         ("Contrats de travail CDI CDD",    "R-RH-CTR",  1),
+         ("Bulletins de salaire",           "R-RH-PAIE", 2),
+         ("Conventions et rapports stage",  "R-RH-STAG", 3),
+         ("Documents de formation",         "R-RH-FORM", 4),
+     ]),
     ("Armoire Systemes Information", "ARM-DSI",
-     "Documentation technique et licences", [
-        ("Licences logicielles",           "R-DSI-LIC",  1),
-        ("Manuels et procedures",          "R-DSI-DOC",  2),
-        ("Documents projets informatiques","R-DSI-PROJ", 3),
-    ]),
+     "Documentation technique et licences", "DEV", [
+         ("Licences logicielles",           "R-DSI-LIC",  1),
+         ("Manuels et procedures",          "R-DSI-DOC",  2),
+         ("Documents projets informatiques","R-DSI-PROJ", 3),
+     ]),
     ("Armoire Direction Financiere", "ARM-DFIN",
-     "Documents financiers et budgets", [
-        ("Budgets previsionnels",          "R-DFIN-BUD",  1),
-        ("Documents de tresorerie",        "R-DFIN-TRES", 2),
-        ("Rapports financiers mensuels",   "R-DFIN-RPT",  3),
-    ]),
+     "Documents financiers et budgets", "TRES", [
+         ("Budgets previsionnels",          "R-DFIN-BUD",  1),
+         ("Documents de tresorerie",        "R-DFIN-TRES", 2),
+         ("Rapports financiers mensuels",   "R-DFIN-RPT",  3),
+     ]),
     ("Armoire Direction Commerciale", "ARM-DCO",
-     "Plans commerciaux et rapports de ventes", [
-        ("Plans d action commerciaux",     "R-DCO-PAC", 1),
-        ("Rapports de ventes",             "R-DCO-RV",  2),
-        ("Dossiers clients entreprises",   "R-DCO-CLI", 3),
-    ]),
+     "Plans commerciaux et rapports de ventes", "VENTES", [
+         ("Plans d action commerciaux",     "R-DCO-PAC", 1),
+         ("Rapports de ventes",             "R-DCO-RV",  2),
+         ("Dossiers clients entreprises",   "R-DCO-CLI", 3),
+     ]),
     ("Armoire Logistique", "ARM-DLOG",
-     "Bons de commande stocks et livraisons", [
-        ("Bons de commande decodeurs",     "R-LOG-BC",  1),
-        ("Etats de stock boutiques",       "R-LOG-STK", 2),
-        ("Bons de livraison",              "R-LOG-LIV", 3),
-    ]),
+     "Bons de commande stocks et livraisons", "LOG-BQ", [
+         ("Bons de commande decodeurs",     "R-LOG-BC",  1),
+         ("Etats de stock boutiques",       "R-LOG-STK", 2),
+         ("Bons de livraison",              "R-LOG-LIV", 3),
+     ]),
     ("Armoire Reabonnements", "ARM-REABO",
-     "Dossiers reabonnements et suivi clients", [
-        ("Dossiers de reabonnement",       "R-REABO-D",   1),
-        ("Rapports de suivi mensuel",      "R-REABO-RPT", 2),
-    ]),
+     "Dossiers reabonnements et suivi clients", "REABO", [
+         ("Dossiers de reabonnement",       "R-REABO-D",   1),
+         ("Rapports de suivi mensuel",      "R-REABO-RPT", 2),
+     ]),
     ("Armoire Direction Technique", "ARM-DT",
-     "Documents techniques et SAV", [
-        ("Fiches d intervention SAV",      "R-DT-SAV",   1),
-        ("Documents equipements",          "R-DT-EQUIP", 2),
-    ]),
+     "Documents techniques et SAV", "DT-TECH", [
+         ("Fiches d intervention SAV",      "R-DT-SAV",   1),
+         ("Documents equipements",          "R-DT-EQUIP", 2),
+     ]),
     ("Armoire Corporate Sales", "ARM-CS",
-     "Contrats et dossiers corporate", [
-        ("Contrats entreprises",           "R-CS-CTR", 1),
-        ("Propositions commerciales",      "R-CS-PRO", 2),
-    ]),
+     "Contrats et dossiers corporate", "CS-SVC", [
+         ("Contrats entreprises",           "R-CS-CTR", 1),
+         ("Propositions commerciales",      "R-CS-PRO", 2),
+     ]),
 ]
 
 # (matricule, password, nom, prenom, email, role, code_service)
@@ -197,37 +197,31 @@ class Command(BaseCommand):
             if created:
                 s_new += 1
         self.stdout.write(f"      Services     : {s_new} crees, {len(SERVICES)-s_new} mis a jour")
-
     def _create_armoires_rayons(self):
         from apps.armoires.models import Armoire, Rayon
 
         a_new = 0
         r_new = 0
-        total_rayons = sum(len(a[3]) for a in ARMOIRES)
+        total_rayons = sum(len(a[4]) for a in ARMOIRES)
 
-        for nom, code, description, rayons in ARMOIRES:
-            arm, created = Armoire.objects.get_or_create(
+        for nom, code, description, code_svc, rayons in ARMOIRES:
+            svc = self.svc_map.get(code_svc)
+            if not svc:
+                self.stdout.write(self.style.WARNING(f"  Service {code_svc} introuvable pour {code}, ignore"))
+                continue
+            arm, created = Armoire.objects.update_or_create(
                 code=code,
-                defaults={"nom": nom, "description": description}
+                defaults={"nom": nom, "description": description, "service": svc}
             )
-            if not created:
-                arm.nom         = nom
-                arm.description = description
-                arm.save()
             if created:
                 a_new += 1
 
             for nom_rayon, code_rayon, position in rayons:
-                ray, rcreated = Rayon.objects.get_or_create(
+                Rayon.objects.update_or_create(
                     code=code_rayon,
                     defaults={"nom": nom_rayon, "position": position, "armoire": arm}
                 )
-                if not rcreated:
-                    ray.nom      = nom_rayon
-                    ray.position = position
-                    ray.armoire  = arm
-                    ray.save()
-                if rcreated:
+                if created:
                     r_new += 1
 
         self.stdout.write(f"[3/4] Armoires : {a_new} creees, {len(ARMOIRES)-a_new} mises a jour")
