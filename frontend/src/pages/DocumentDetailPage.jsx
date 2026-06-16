@@ -79,10 +79,6 @@ function MetadataEditor({ docId, metadata, onSave }) {
   const addMot = () => { if (motCle.trim() && !motsCles.includes(motCle.trim())) { setMotsCles([...motsCles, motCle.trim()]); setMotCle('') } }
   return (
     <form onSubmit={handleSubmit(d => mutation.mutate(d))} className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div><label className="label">Auteur</label><input className="input" {...register('auteur')} /></div>
-        <div><label className="label">Destinataire</label><input className="input" {...register('destinataire')} /></div>
-      </div>
       <div><label className="label">Date d'émission</label><input type="date" className="input" {...register('date_emission')} /></div>
       <div>
         <label className="label">Mots-clés</label>
@@ -500,8 +496,6 @@ export default function DocumentDetailPage() {
               ) : (
                 <div className="grid grid-cols-2 gap-4">
                   {[
-                    { label: 'Auteur',          value: doc.metadata?.auteur || '—' },
-                    { label: 'Destinataire',    value: doc.metadata?.destinataire || '—' },
                     { label: "Date d'émission", value: doc.metadata?.date_emission ? format(new Date(doc.metadata.date_emission), 'dd MMMM yyyy', { locale: fr }) : '—' },
                     { label: 'Description',     value: doc.metadata?.description || '—', full: true },
                   ].map(({ label, value, full }) => (

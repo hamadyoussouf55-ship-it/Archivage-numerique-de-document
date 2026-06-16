@@ -259,7 +259,9 @@ export default function AdminPage() {
                         <button onClick={() => toggleActive.mutate({ id: user.id, is_active: !user.is_active })} className="p-1.5 rounded hover:bg-yellow-50 transition-colors" style={{ color: '#ca8a04' }}>
                           {user.is_active ? <UserX size={14} /> : <UserCheck size={14} />}
                         </button>
-                        <button onClick={() => { if (confirm(`Supprimer ${user.full_name} ?`)) deleteUser.mutate(user.id) }} className="p-1.5 rounded hover:bg-red-50 transition-colors" style={{ color: '#dc2626' }}><Trash2 size={14} /></button>
+                        {user.role !== 'ADMIN' && (
+                          <button onClick={() => { if (confirm(`Supprimer ${user.full_name} ?`)) deleteUser.mutate(user.id) }} className="p-1.5 rounded hover:bg-red-50 transition-colors" style={{ color: '#dc2626' }}><Trash2 size={14} /></button>
+                        )}
                       </div>
                     </td>
                   </tr>

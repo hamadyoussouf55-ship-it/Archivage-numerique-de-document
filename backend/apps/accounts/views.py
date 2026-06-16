@@ -64,3 +64,9 @@ class CollaborateurDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def get_serializer_class(self):
         return CollaborateurUpdateSerializer if self.request.method in ('PUT', 'PATCH') else CollaborateurSerializer
+
+    def perform_destroy(self, instance):
+        if instance.role == 'ADMIN':
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Un administrateur ne peut pas supprimer un autre administrateur.")
+        instance.delete()

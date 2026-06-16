@@ -14,9 +14,18 @@ export default function LoginPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault(); setLoading(true)
-    try { await login(email, password); navigate('/') }
-    catch (err) { toast.error(err.response?.data?.detail || 'Identifiants incorrects') }
-    finally { setLoading(false) }
+    try {
+      await login(email, password)
+      toast.success('Connexion réussie !')
+      navigate('/')
+    } catch (err) {
+      const msg = err.response?.data?.detail
+      if (msg?.includes('No active account') || msg?.includes('credentials') || err.response?.status === 401) {
+        toast.error('Adresse email ou mot de passe incorrect')
+      } else {
+        toast.error(msg || 'Erreur de connexion')
+      }
+    } finally { setLoading(false) }
   }
 
   return (
