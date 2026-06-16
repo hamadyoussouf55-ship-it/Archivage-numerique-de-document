@@ -19,12 +19,9 @@ export default function LoginPage() {
       toast.success('Connexion réussie !')
       navigate('/')
     } catch (err) {
-      const msg = err.response?.data?.detail
-      if (msg?.includes('No active account') || msg?.includes('credentials') || err.response?.status === 401) {
-        toast.error('Adresse email ou mot de passe incorrect')
-      } else {
-        toast.error(msg || 'Erreur de connexion')
-      }
+      const data = err.response?.data
+      const msg = data?.non_field_errors?.[0] || data?.detail || (Array.isArray(data) ? data[0] : data) || 'Erreur de connexion'
+      toast.error(msg)
     } finally { setLoading(false) }
   }
 

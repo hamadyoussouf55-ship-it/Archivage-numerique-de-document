@@ -116,7 +116,9 @@ export const armoiresAPI = {
   getRayons:    (id)        => api.get(`/armoires/${id}/rayons/`),
   getRayon:     (id)        => api.get(`/armoires/rayons/${id}/`),
   createRayon:  (id, data)  => api.post(`/armoires/${id}/rayons/`, data),
+  updateRayon:  (id, data)  => api.patch(`/armoires/rayons/${id}/`, data),
   deleteRayon:  (id)        => api.delete(`/armoires/rayons/${id}/`),
+  listRayons:   (params)    => api.get('/armoires/rayons/', { params }),
 }
 
 // ── Documents ─────────────────────────────────────────────────────────────────

@@ -26,6 +26,12 @@ class ArmoireDetailView(generics.RetrieveUpdateDestroyAPIView):
     def get_permissions(self):
         return [permissions.IsAuthenticated()] if self.request.method == 'GET' else [IsAdmin()]
 
+    def perform_destroy(self, instance):
+        if instance.rayons.exists():
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Supprimez d'abord les rayons de cette armoire.")
+        instance.delete()
+
 
 class RayonParArmoireView(generics.ListCreateAPIView):
     """
@@ -62,3 +68,9 @@ class RayonDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def get_permissions(self):
         return [permissions.IsAuthenticated()] if self.request.method == 'GET' else [IsAdminOrArchiviste()]
+
+    def perform_destroy(self, instance):
+        if instance.documents.exists():
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Supprimez d'abord les documents de ce rayon.")
+        instance.delete()

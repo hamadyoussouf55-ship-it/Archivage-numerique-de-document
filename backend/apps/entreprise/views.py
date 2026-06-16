@@ -28,6 +28,12 @@ class DepartementDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = DepartementSerializer
     permission_classes = [IsAdmin]
 
+    def perform_destroy(self, instance):
+        if instance.services.exists():
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Supprimez d'abord les services de ce département.")
+        instance.delete()
+
 class ServiceListCreateView(generics.ListCreateAPIView):
     queryset         = Service.objects.select_related('departement').all()
     serializer_class = ServiceSerializer
@@ -39,6 +45,12 @@ class ServiceDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset         = Service.objects.all()
     serializer_class = ServiceSerializer
     permission_classes = [IsAdmin]
+
+    def perform_destroy(self, instance):
+        if instance.armoires.exists():
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Supprimez d'abord les armoires de ce service.")
+        instance.delete()
 
 class RoleListCreateView(generics.ListCreateAPIView):
     queryset         = RoleDepartementService.objects.select_related('collaborateur','departement','service').all()

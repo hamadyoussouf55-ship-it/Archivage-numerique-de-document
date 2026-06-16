@@ -62,9 +62,26 @@ class SygalinTokenSerializer(TokenObtainPairSerializer):
         return token
 
     def validate(self, attrs):
-        data = super().validate(attrs)
-        data['user'] = CollaborateurSerializer(self.user).data
-        return data
+        email    = attrs.get('email')
+        password = attrs.get('password')
+
+        try:
+            user = Collaborateur.objects.get(email=email)
+        except Collaborateur.DoesNotExist:
+            raise serializers.ValidationError("Adresse email incorrecte")
+
+        if not user.check_password(password):
+            raise serializers.ValidationError("Mot de passe incorrect")
+
+        if not user.is_active:
+            raise serializers.ValidationError("Compte désactivé")
+
+        refresh = self.get_token(user)
+        return {
+            'refresh': str(refresh),
+            'access':  str(refresh.access_token),
+            'user':    CollaborateurSerializer(user).data,
+        }
 
 
 class ChangePasswordSerializer(serializers.Serializer):
