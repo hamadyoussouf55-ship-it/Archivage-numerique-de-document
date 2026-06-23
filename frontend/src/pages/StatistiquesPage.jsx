@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from 'react-query'
-import { documentsAPI } from '../services/api'
+import { documentsAPI, journalAPI } from '../services/api'
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid
@@ -360,26 +360,22 @@ export default function StatistiquesPage() {
           <Download size={16} style={{ color: '#2563eb' }} /> Exporter les données
         </h2>
         <div className="flex flex-wrap gap-3">
-          <a href={`/api/documents/export/csv/?debut=${debut}&fin=${fin}`}
-            className="btn-secondary flex items-center gap-2"
-            target="_blank" rel="noreferrer">
+          <button onClick={() => documentsAPI.exportCSV({ debut, fin })}
+            className="btn-secondary flex items-center gap-2">
             <Download size={14} /> Documents CSV
-          </a>
-          <a href={`/api/documents/export/pdf/?debut=${debut}&fin=${fin}`}
-            className="btn-secondary flex items-center gap-2"
-            target="_blank" rel="noreferrer">
+          </button>
+          <button onClick={() => documentsAPI.exportPDF({ debut, fin })}
+            className="btn-secondary flex items-center gap-2">
             <Download size={14} /> Documents PDF
-          </a>
-          <a href={`/api/journal/export/csv/?date_debut=${debut}&date_fin=${fin}`}
-            className="btn-secondary flex items-center gap-2"
-            target="_blank" rel="noreferrer">
+          </button>
+          <button onClick={() => journalAPI.exportCSV({ date_debut: debut, date_fin: fin })}
+            className="btn-secondary flex items-center gap-2">
             <Download size={14} /> Journal CSV
-          </a>
-          <a href={`/api/journal/export/pdf/?date_debut=${debut}&date_fin=${fin}`}
-            className="btn-secondary flex items-center gap-2"
-            target="_blank" rel="noreferrer">
+          </button>
+          <button onClick={() => journalAPI.exportPDF({ date_debut: debut, date_fin: fin })}
+            className="btn-secondary flex items-center gap-2">
             <Download size={14} /> Journal PDF
-          </a>
+          </button>
         </div>
         <p className="text-xs mt-2" style={{ color: '#94a3b8' }}>
           Les exports appliquent automatiquement les filtres de la période sélectionnée.

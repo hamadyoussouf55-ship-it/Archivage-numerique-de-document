@@ -27,4 +27,9 @@ urlpatterns = [
     path('<uuid:pk>/versions/',                           DocumentVersionsView.as_view(), name='document-versions'),
     path('<uuid:pk>/versions/<uuid:v_pk>/',               VersionDetailView.as_view(),    name='version-detail'),
     path('<uuid:pk>/versions/<uuid:v_pk>/restaurer/',     VersionDetailView.as_view(),    name='version-restaurer'),
+
+    # Corbeille
+    path('corbeille/',                    views.DocumentCorbeilleListView.as_view(), name='document-corbeille'),
+    path('corbeille/<uuid:pk>/restaurer/', views.DocumentRestaurerView.as_view(),    name='document-restaurer'),
+    path('corbeille/<uuid:pk>/purger/',    views.DocumentPurgerView.as_view(),       name='document-purger'),
 ]

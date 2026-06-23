@@ -46,6 +46,7 @@ class Collaborateur(AbstractBaseUser, PermissionsMixin):
         null=True, blank=True, related_name='collaborateurs'
     )
     is_active   = models.BooleanField(default=True)
+    is_principal = models.BooleanField(default=False)
     is_staff    = models.BooleanField(default=False)
     date_joined = models.DateTimeField(auto_now_add=True)
 

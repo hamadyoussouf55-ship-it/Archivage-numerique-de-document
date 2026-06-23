@@ -12,7 +12,7 @@ from .serializers import (
     CollaborateurUpdateSerializer, SygalinTokenSerializer,
     ChangePasswordSerializer,
 )
-from .permissions import IsAdmin, IsAdminOrSelf
+from .permissions import IsAdmin
 
 
 class LoginView(TokenObtainPairView):
@@ -57,16 +57,32 @@ class CollaborateurListCreateView(generics.ListCreateAPIView):
     def get_permissions(self):
         return [IsAdmin()] if self.request.method == 'POST' else [permissions.IsAuthenticated()]
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        if user.role == 'ADMIN' and not user.is_principal:
+            qs = qs.filter(departement=user.departement)
+        return qs
+
 
 class CollaborateurDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Collaborateur.objects.all()
-    permission_classes = [IsAdminOrSelf]
+    permission_classes = [IsAdmin]
 
     def get_serializer_class(self):
         return CollaborateurUpdateSerializer if self.request.method in ('PUT', 'PATCH') else CollaborateurSerializer
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        if user.role == 'ADMIN' and not user.is_principal:
+            qs = qs.filter(departement=user.departement)
+        return qs
+
     def perform_destroy(self, instance):
-        if instance.role == 'ADMIN':
-            from rest_framework.exceptions import PermissionDenied
-            raise PermissionDenied("Un administrateur ne peut pas supprimer un autre administrateur.")
+        from rest_framework.exceptions import PermissionDenied
+        if instance.is_principal:
+            raise PermissionDenied("Impossible de supprimer l'administrateur principal.")
+        if instance.role == 'ADMIN' and not self.request.user.is_principal:
+            raise PermissionDenied("Seul l'administrateur principal peut supprimer un administrateur.")
         instance.delete()

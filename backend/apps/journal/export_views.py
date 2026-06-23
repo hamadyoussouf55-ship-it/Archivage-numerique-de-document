@@ -1,5 +1,6 @@
 from rest_framework.views import APIView
 from rest_framework import permissions
+from django.db.models import Q
 from apps.accounts.permissions import IsAdmin
 from .models import JournalAction
 
@@ -10,6 +11,12 @@ class JournalExportCSVView(APIView):
     def get(self, request):
         from apps.documents.exports import export_journal_csv
         qs = JournalAction.objects.select_related('auteur', 'document').all()
+        user = request.user
+        if not user.is_principal and user.departement:
+            qs = qs.filter(
+                Q(auteur__departement=user.departement) |
+                Q(document__rayon__armoire__service__departement=user.departement)
+            )
         type_action = request.query_params.get('type_action')
         auteur      = request.query_params.get('auteur')
         date_debut  = request.query_params.get('date_debut')
@@ -39,6 +46,12 @@ class JournalExportPDFView(APIView):
     def get(self, request):
         from apps.documents.exports import export_journal_pdf
         qs = JournalAction.objects.select_related('auteur', 'document').all()
+        user = request.user
+        if not user.is_principal and user.departement:
+            qs = qs.filter(
+                Q(auteur__departement=user.departement) |
+                Q(document__rayon__armoire__service__departement=user.departement)
+            )
         type_action = request.query_params.get('type_action')
         auteur      = request.query_params.get('auteur')
         date_debut  = request.query_params.get('date_debut')

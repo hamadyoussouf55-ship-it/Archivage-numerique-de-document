@@ -47,7 +47,10 @@ function DepartementModal({ onClose, onSuccess }) {
   const { register, handleSubmit, formState: { errors } } = useForm()
   const { data: entreprises } = useQuery('entreprises', () => entrepriseAPI.getEntreprises().then(r => r.data))
   const mutation = useMutation(
-    (data) => entrepriseAPI.createDepartement(data),
+    (data) => {
+      const firstEnt = entreprises?.results?.[0]
+      return entrepriseAPI.createDepartement({ ...data, entreprise: firstEnt?.id })
+    },
     { onSuccess: () => { toast.success('Département créé !'); onSuccess() }, onError: (e) => toast.error(Object.values(e.response?.data || {}).flat().join(' ') || 'Erreur') }
   )
   return (
@@ -55,10 +58,6 @@ function DepartementModal({ onClose, onSuccess }) {
       <form onSubmit={handleSubmit(d => mutation.mutate(d))} className="space-y-4">
         <div><label className="label">Nom *</label><input className="input" {...register('nom', { required: true })} />{errors.nom && <p className="text-red-500 text-xs mt-1">Requis</p>}</div>
         <div><label className="label">Code *</label><input className="input font-mono uppercase" {...register('code', { required: true })} />{errors.code && <p className="text-red-500 text-xs mt-1">Requis</p>}</div>
-        <div><label className="label">Entreprise *</label>
-          <select className="input" {...register('entreprise', { required: true })}><option value="">Sélectionner…</option>{entreprises?.results?.map(e => <option key={e.id} value={e.id}>{e.nom}</option>)}</select>
-          {errors.entreprise && <p className="text-red-500 text-xs mt-1">Requis</p>}
-        </div>
         <div className="flex gap-3">
           <button type="button" onClick={onClose} className="btn-secondary flex-1 justify-center">Annuler</button>
           <button type="submit" disabled={mutation.isLoading} className="btn-primary flex-1 justify-center">

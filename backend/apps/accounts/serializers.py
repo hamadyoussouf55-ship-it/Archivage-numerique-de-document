@@ -13,12 +13,13 @@ class CollaborateurSerializer(serializers.ModelSerializer):
         model  = Collaborateur
         fields = [
             'id', 'nom', 'prenom', 'full_name', 'email', 'matricule', 'role',
+            'is_principal',
             'entreprise', 'entreprise_nom',
             'departement', 'departement_nom',
             'service', 'service_nom',
             'is_active', 'date_joined',
         ]
-        read_only_fields = ['id', 'date_joined']
+        read_only_fields = ['id', 'date_joined', 'is_principal']
 
 
 class CollaborateurCreateSerializer(serializers.ModelSerializer):
@@ -29,6 +30,27 @@ class CollaborateurCreateSerializer(serializers.ModelSerializer):
         model  = Collaborateur
         fields = ['nom', 'prenom', 'email', 'matricule', 'role',
                   'entreprise', 'departement', 'service', 'password', 'password2']
+
+    def validate_role(self, value):
+        request = self.context.get('request')
+        if request and value == 'ADMIN' and not request.user.is_principal:
+            raise serializers.ValidationError("Seul l'administrateur principal peut créer des administrateurs.")
+        return value
+
+    def validate_departement(self, value):
+        request = self.context.get('request')
+        if not request:
+            return value
+        # Chef de département : département obligatoire et forcé au sien
+        if request.user.role == 'ADMIN' and not request.user.is_principal:
+            if not request.user.departement:
+                raise serializers.ValidationError("Vous n'avez pas de département rattaché.")
+            return request.user.departement.id
+        # Principal admin : libre choix, mais requis pour les non-principaux
+        role = self.initial_data.get('role')
+        if role and role != 'ADMIN' and not value:
+            raise serializers.ValidationError("Le département est obligatoire.")
+        return value
 
     def validate(self, data):
         if data['password'] != data.pop('password2'):
@@ -49,6 +71,32 @@ class CollaborateurUpdateSerializer(serializers.ModelSerializer):
         fields = ['nom', 'prenom', 'email', 'matricule', 'role',
                   'entreprise', 'departement', 'service', 'is_active']
 
+    def validate_role(self, value):
+        request = self.context.get('request')
+        if request and value == 'ADMIN' and not request.user.is_principal:
+            raise serializers.ValidationError("Seul l'administrateur principal peut attribuer le rôle ADMIN.")
+        return value
+
+    def validate_is_active(self, value):
+        instance = self.instance
+        if instance and instance.is_principal and value is False:
+            raise serializers.ValidationError("Impossible de désactiver l'administrateur principal.")
+        return value
+
+    def validate_departement(self, value):
+        request = self.context.get('request')
+        if not request:
+            return value
+        # Chef de département : ne peut changer le département d'un collaborateur
+        if request.user.role == 'ADMIN' and not request.user.is_principal:
+            if not request.user.departement:
+                raise serializers.ValidationError("Vous n'avez pas de département rattaché.")
+            instance = self.instance
+            if instance and instance.departement_id != request.user.departement_id:
+                raise serializers.ValidationError("Vous ne pouvez modifier que les collaborateurs de votre département.")
+            return request.user.departement.id
+        return value
+
 
 class SygalinTokenSerializer(TokenObtainPairSerializer):
     @classmethod
@@ -59,6 +107,7 @@ class SygalinTokenSerializer(TokenObtainPairSerializer):
         token['email']     = user.email
         token['matricule'] = user.matricule
         token['role']      = user.role
+        token['is_principal'] = user.is_principal
         return token
 
     def validate(self, attrs):

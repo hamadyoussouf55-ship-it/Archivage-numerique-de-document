@@ -20,7 +20,7 @@ export default function ProfilePage() {
     }
   )
 
-  const ROLE_LABEL = { ADMIN: 'Administrateur', ARCHIVISTE: 'Archiviste', CONSULTANT: 'Consultant' }
+  const ROLE_LABEL = { ADMIN: 'Chef de département', ARCHIVISTE: 'Archiviste', CONSULTANT: 'Consultant' }
 
   return (
     <div className="p-6 max-w-2xl mx-auto space-y-5">

@@ -174,6 +174,11 @@ export const documentsAPI = {
   restaurerVersion: (docId, vId)    => api.post(`/documents/${docId}/versions/${vId}/restaurer/`),
   supprimerVersion: (docId, vId)    => api.delete(`/documents/${docId}/versions/${vId}/`),
 
+  // Corbeille
+  corbeille:       ()         => api.get('/documents/corbeille/'),
+  restaurerDoc:    (id)       => api.post(`/documents/corbeille/${id}/restaurer/`),
+  purgerDoc:       (id)       => api.delete(`/documents/corbeille/${id}/purger/`),
+
   // Téléchargement / prévisualisation sécurisés
   telecharger: async (id, nomFichier) => {
     const token = localStorage.getItem('access_token')

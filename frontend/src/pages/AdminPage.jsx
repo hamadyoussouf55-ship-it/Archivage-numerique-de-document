@@ -3,9 +3,11 @@ import { useQuery, useMutation, useQueryClient } from 'react-query'
 import { authAPI, entrepriseAPI, armoiresAPI } from '../services/api'
 import { toast } from 'react-toastify'
 import { useForm } from 'react-hook-form'
+import { useAuth } from '../context/AuthContext'
 import { Users, Plus, Search, Shield, Edit2, Trash2, X, Check, UserCheck, UserX, Building2, Layers, Archive, Hash, ChevronDown, ChevronRight } from 'lucide-react'
 
 const ROLE_BADGE = { ADMIN: 'badge-blue', ARCHIVISTE: 'badge-green', CONSULTANT: 'badge-gray' }
+const ROLE_LABEL = { ADMIN: 'Chef de département', ARCHIVISTE: 'Archiviste', CONSULTANT: 'Consultant' }
 const TABS = [
   { id: 'users', label: 'Utilisateurs', icon: Users },
   { id: 'depts', label: 'Départements', icon: Building2 },
@@ -31,9 +33,10 @@ function Modal({ title, onClose, children }) {
 
 function CollaborateurModal({ collab, onClose, onSuccess }) {
   const isEdit = !!collab
+  const { user: currentUser } = useAuth()
+  const isSelf = isEdit && collab.id === currentUser?.id
   const { register, handleSubmit, formState: { errors } } = useForm({ defaultValues: collab || { role: 'CONSULTANT' } })
-  const { data: depts }    = useQuery('departements', () => entrepriseAPI.getDepartements().then(r => r.data))
-  const { data: services } = useQuery('services',     () => entrepriseAPI.getServices().then(r => r.data))
+  const { data: depts } = useQuery('departements', () => entrepriseAPI.getDepartements().then(r => r.data))
   const mutation = useMutation(
     (data) => isEdit ? authAPI.updateCollaborateur(collab.id, data) : authAPI.createCollaborateur(data),
     { onSuccess: () => { toast.success(isEdit ? 'Mis à jour !' : 'Créé !'); onSuccess() },
@@ -47,24 +50,33 @@ function CollaborateurModal({ collab, onClose, onSuccess }) {
           <div><label className="label">Nom *</label><input className="input" {...register('nom', { required: true })} /></div>
         </div>
         <div><label className="label">Email *</label><input type="email" className="input" {...register('email', { required: true })} /></div>
-        <div className="grid grid-cols-2 gap-4">
-          <div><label className="label">Matricule *</label><input className="input font-mono" {...register('matricule', { required: true })} /></div>
-          <div><label className="label">Rôle</label>
-            <select className="input" {...register('role')}>
-              <option value="CONSULTANT">Consultant</option>
-              <option value="ARCHIVISTE">Archiviste</option>
-              <option value="ADMIN">Administrateur</option>
-            </select>
+        {!isSelf && (
+          <div className="grid grid-cols-2 gap-4">
+            <div><label className="label">Matricule *</label><input className="input font-mono" {...register('matricule', { required: true })} /></div>
+            <div><label className="label">Rôle</label>
+              <select className="input" {...register('role')}>
+                <option value="CONSULTANT">Consultant</option>
+                <option value="ARCHIVISTE">Archiviste</option>
+                {currentUser?.is_principal && <option value="ADMIN">Chef de département</option>}
+              </select>
+            </div>
           </div>
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div><label className="label">Département</label>
-            <select className="input" {...register('departement')}><option value="">Aucun</option>{depts?.results?.map(d => <option key={d.id} value={d.id}>{d.nom}</option>)}</select>
+        )}
+        {!isSelf && (
+          <div className="grid grid-cols-2 gap-4">
+            <div><label className="label">Département</label>
+              {currentUser?.is_principal ? (
+                <select className="input" {...register('departement')}><option value="">Sélectionner…</option>{depts?.results?.map(d => <option key={d.id} value={d.id}>{d.nom}</option>)}</select>
+              ) : (
+                <div>
+                  <input className="input" value={currentUser?.departement_nom || '—'} disabled />
+                  <input type="hidden" {...register('departement')} value={currentUser?.departement || ''} />
+                </div>
+              )}
+            </div>
+            <div></div>
           </div>
-          <div><label className="label">Service</label>
-            <select className="input" {...register('service')}><option value="">Aucun</option>{services?.results?.map(s => <option key={s.id} value={s.id}>{s.nom}</option>)}</select>
-          </div>
-        </div>
+        )}
         {!isEdit && (
           <div className="grid grid-cols-2 gap-4">
             <div><label className="label">Mot de passe *</label><input type="password" className="input" {...register('password', { required: true, minLength: 6 })} /></div>
@@ -84,9 +96,11 @@ function CollaborateurModal({ collab, onClose, onSuccess }) {
 
 function OrgModal({ type, item, onClose, onSuccess }) {
   const isEdit = !!item
-  const { register, handleSubmit } = useForm({ defaultValues: item || {} })
+  const { user: currentUser } = useAuth()
+  const { register, handleSubmit, setValue } = useForm({ defaultValues: item || {} })
   const { data: entreprises } = useQuery('entreprises', () => entrepriseAPI.getEntreprises().then(r => r.data), { enabled: type === 'departement' })
   const { data: depts } = useQuery('departements', () => entrepriseAPI.getDepartements().then(r => r.data), { enabled: type === 'service' })
+
   const mutation = useMutation(
     (data) => type === 'departement' ? (isEdit ? entrepriseAPI.updateDepartement(item.id, data) : entrepriseAPI.createDepartement(data)) : (isEdit ? entrepriseAPI.updateService(item.id, data) : entrepriseAPI.createService(data)),
     { onSuccess: () => { toast.success(isEdit ? 'Mis à jour !' : 'Créé !'); onSuccess() }, onError: (e) => toast.error(Object.values(e.response?.data || {}).flat().join(' ') || 'Erreur') }
@@ -102,9 +116,16 @@ function OrgModal({ type, item, onClose, onSuccess }) {
           </div>
         )}
         {type === 'service' && (
-          <div><label className="label">Département *</label>
-            <select className="input" {...register('departement', { required: true })}><option value="">Sélectionner…</option>{depts?.results?.map(d => <option key={d.id} value={d.id}>{d.nom}</option>)}</select>
-          </div>
+          currentUser?.is_principal ? (
+            <div><label className="label">Département *</label>
+              <select className="input" {...register('departement', { required: true })}><option value="">Sélectionner…</option>{depts?.results?.map(d => <option key={d.id} value={d.id}>{d.nom}</option>)}</select>
+            </div>
+          ) : (
+            <div>
+              <input className="input" value={currentUser?.departement_nom || '—'} disabled />
+              <input type="hidden" {...register('departement')} value={currentUser?.departement || ''} />
+            </div>
+          )
         )}
         <div className="flex gap-3">
           <button type="button" onClick={onClose} className="btn-secondary flex-1 justify-center">Annuler</button>
@@ -119,6 +140,7 @@ function OrgModal({ type, item, onClose, onSuccess }) {
 
 function ArmoireModal({ item, onClose, onSuccess }) {
   const isEdit = !!item
+  const { user: currentUser } = useAuth()
   const { register, handleSubmit } = useForm({ defaultValues: item || {} })
   const { data: services } = useQuery('services', () => entrepriseAPI.getServices().then(r => r.data))
   const mutation = useMutation(
@@ -184,6 +206,7 @@ function ExpandIcon({ expanded }) {
 }
 
 export default function AdminPage() {
+  const { user: currentUser } = useAuth()
   const qc = useQueryClient()
   const [tab, setTab]       = useState('users')
   const [search, setSearch] = useState('')
@@ -269,7 +292,7 @@ export default function AdminPage() {
             </div>
             <select value={role} onChange={e => setRole(e.target.value)} className="input w-44">
               <option value="">Tous les rôles</option>
-              <option value="ADMIN">Administrateur</option>
+              <option value="ADMIN">Chef de département</option>
               <option value="ARCHIVISTE">Archiviste</option>
               <option value="CONSULTANT">Consultant</option>
             </select>
@@ -302,17 +325,35 @@ export default function AdminPage() {
                       </div>
                     </td>
                     <td className="px-5 py-3 font-mono text-xs" style={{ color: '#64748b' }}>{user.matricule}</td>
-                    <td className="px-5 py-3"><span className={ROLE_BADGE[user.role] || 'badge-gray'}>{user.role}</span></td>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-1.5"><span className={ROLE_BADGE[user.role] || 'badge-gray'}>{ROLE_LABEL[user.role] || user.role}</span>{user.is_principal && <span className="text-xs px-1.5 py-0.5 rounded-full font-semibold" style={{ background: '#fef3c7', color: '#92400e' }}>Principal</span>}</div>
+                    </td>
                     <td className="px-5 py-3 text-xs" style={{ color: '#64748b' }}>{user.departement_nom || '—'}</td>
                     <td className="px-5 py-3"><span className={user.is_active ? 'badge-green' : 'badge-red'}>{user.is_active ? 'Actif' : 'Inactif'}</span></td>
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => setModal({ type: 'user', item: user })} className="p-1.5 rounded hover:bg-blue-50 transition-colors" style={{ color: '#2563eb' }}><Edit2 size={14} /></button>
-                        <button onClick={() => toggleActive.mutate({ id: user.id, is_active: !user.is_active })} className="p-1.5 rounded hover:bg-yellow-50 transition-colors" style={{ color: '#ca8a04' }}>
-                          {user.is_active ? <UserX size={14} /> : <UserCheck size={14} />}
-                        </button>
-                        {user.role !== 'ADMIN' && (
-                          <button onClick={() => { if (confirm(`Supprimer ${user.full_name} ?`)) deleteUser.mutate(user.id) }} className="p-1.5 rounded hover:bg-red-50 transition-colors" style={{ color: '#dc2626' }}><Trash2 size={14} /></button>
+                        {currentUser?.role === 'ADMIN' && (
+                          <>
+                            {/* Éditer : principal peut éditer sauf lui-même ; admin peut éditer archiviste/consultant */}
+                            {((currentUser?.is_principal && user.id !== currentUser?.id) || (!currentUser?.is_principal && user.role !== 'ADMIN')) && (
+                              <button onClick={() => setModal({ type: 'user', item: user })} className="p-1.5 rounded hover:bg-blue-50 transition-colors" style={{ color: '#2563eb' }}><Edit2 size={14} /></button>
+                            )}
+                            {/* Activer/Désactiver : principal peut tout sauf lui-même ; admin peut arch/consultant */}
+                            {!user.is_principal && ((currentUser?.is_principal) || (!currentUser?.is_principal && user.role !== 'ADMIN')) && (
+                              <button onClick={() => {
+                                if (user.role === 'ADMIN' && !currentUser?.is_principal) {
+                                  return toast.error("Seul l'administrateur principal peut désactiver un administrateur.")
+                                }
+                                toggleActive.mutate({ id: user.id, is_active: !user.is_active })
+                              }} className="p-1.5 rounded hover:bg-yellow-50 transition-colors" style={{ color: '#ca8a04' }}>
+                                {user.is_active ? <UserX size={14} /> : <UserCheck size={14} />}
+                              </button>
+                            )}
+                            {/* Supprimer : principal peut tout sauf lui-même ; admin peut arch/consultant */}
+                            {!user.is_principal && (currentUser?.is_principal || user.role !== 'ADMIN') && (
+                              <button onClick={() => { if (confirm(`Supprimer ${user.full_name} ?`)) deleteUser.mutate(user.id) }} className="p-1.5 rounded hover:bg-red-50 transition-colors" style={{ color: '#dc2626' }}><Trash2 size={14} /></button>
+                            )}
+                          </>
                         )}
                       </div>
                     </td>
@@ -327,14 +368,16 @@ export default function AdminPage() {
       {/* Départements */}
       {tab === 'depts' && (
         <>
-          <div className="flex justify-end"><button onClick={() => setModal({ type: 'departement' })} className="btn-primary"><Plus size={15} /> Nouveau département</button></div>
+          {currentUser?.is_principal && (
+            <div className="flex justify-end"><button onClick={() => setModal({ type: 'departement' })} className="btn-primary"><Plus size={15} /> Nouveau département</button></div>
+          )}
           <div className="card overflow-hidden p-0">
             <table className="w-full text-sm">
               <thead style={{ background: '#f8fafc' }}><tr style={{ borderBottom: '1px solid #e2e8f0' }}>
                 {['', 'Code', 'Nom', 'Services', ''].map(h => <th key={h} className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>{h}</th>)}
               </tr></thead>
               <tbody className="divide-y" style={{ borderColor: '#f1f5f9' }}>
-                {depts?.results?.map(d => (
+                {(depts?.results || []).filter(d => currentUser?.is_principal || d.id === currentUser?.departement).map(d => (
                   <>
                     <tr key={d.id} className="group cursor-pointer" onClick={() => setExpandDept(expandDept === d.id ? null : d.id)}
                         onMouseOver={e => e.currentTarget.style.background = '#f8fafc'}
@@ -344,15 +387,17 @@ export default function AdminPage() {
                       <td className="px-5 py-3 font-semibold" style={{ color: '#1e293b' }}>{d.nom}</td>
                       <td className="px-5 py-3 text-xs" style={{ color: '#64748b' }}>{d.services?.length ?? 0} service(s)</td>
                       <td className="px-5 py-3">
-                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={e => { e.stopPropagation(); setModal({ type: 'departement', item: d }) }} className="p-1.5 rounded hover:bg-blue-50 transition-colors" style={{ color: '#2563eb' }}><Edit2 size={14} /></button>
-                          <button onClick={e => {
-                            e.stopPropagation()
-                            const count = d.services?.length ?? 0
-                            if (count > 0) { toast.error(`Supprimez d'abord les ${count} service(s) de ce département.`); return }
-                            if (confirm(`Supprimer le département ${d.nom} ?`)) deleteDept.mutate(d.id)
-                          }} className="p-1.5 rounded hover:bg-red-50 transition-colors" style={{ color: '#dc2626' }}><Trash2 size={14} /></button>
-                        </div>
+                        {currentUser?.is_principal && (
+                          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={e => { e.stopPropagation(); setModal({ type: 'departement', item: d }) }} className="p-1.5 rounded hover:bg-blue-50 transition-colors" style={{ color: '#2563eb' }}><Edit2 size={14} /></button>
+                            <button onClick={e => {
+                              e.stopPropagation()
+                              const count = d.services?.length ?? 0
+                              if (count > 0) { toast.error(`Supprimez d'abord les ${count} service(s) de ce département.`); return }
+                              if (confirm(`Supprimer le département ${d.nom} ?`)) deleteDept.mutate(d.id)
+                            }} className="p-1.5 rounded hover:bg-red-50 transition-colors" style={{ color: '#dc2626' }}><Trash2 size={14} /></button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                     {expandDept === d.id && (
@@ -397,15 +442,18 @@ export default function AdminPage() {
       {/* Services */}
       {tab === 'services' && (
         <>
-          <div className="flex justify-end"><button onClick={() => setModal({ type: 'service' })} className="btn-primary"><Plus size={15} /> Nouveau service</button></div>
+          {(currentUser?.is_principal || currentUser?.role === 'ADMIN') && (
+            <div className="flex justify-end"><button onClick={() => setModal({ type: 'service' })} className="btn-primary"><Plus size={15} /> Nouveau service</button></div>
+          )}
           <div className="card overflow-hidden p-0">
             <table className="w-full text-sm">
               <thead style={{ background: '#f8fafc' }}><tr style={{ borderBottom: '1px solid #e2e8f0' }}>
                 {['', 'Code', 'Nom', 'Département', ''].map(h => <th key={h} className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>{h}</th>)}
               </tr></thead>
               <tbody className="divide-y" style={{ borderColor: '#f1f5f9' }}>
-                {services?.results?.map(s => {
+                {(services?.results || []).filter(s => currentUser?.is_principal || s.departement === currentUser?.departement).map(s => {
                   const nbArmoires = armoires?.results?.filter(a => a.service === s.id).length ?? 0
+                  const canManage = currentUser?.is_principal || currentUser?.role === 'ADMIN'
                   return (
                   <>
                     <tr key={s.id} className="group cursor-pointer" onClick={() => setExpandSvc(expandSvc === s.id ? null : s.id)}
@@ -416,14 +464,16 @@ export default function AdminPage() {
                       <td className="px-5 py-3 font-semibold" style={{ color: '#1e293b' }}>{s.nom}</td>
                       <td className="px-5 py-3 text-xs" style={{ color: '#64748b' }}>{s.departement_nom || '—'}</td>
                       <td className="px-5 py-3">
-                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={e => { e.stopPropagation(); setModal({ type: 'service', item: s }) }} className="p-1.5 rounded hover:bg-blue-50 transition-colors" style={{ color: '#2563eb' }}><Edit2 size={14} /></button>
-                          <button onClick={e => {
-                            e.stopPropagation()
-                            if (nbArmoires > 0) { toast.error(`Supprimez d'abord les ${nbArmoires} armoire(s) de ce service.`); return }
-                            if (confirm(`Supprimer le service ${s.nom} ?`)) deleteSvc.mutate(s.id)
-                          }} className="p-1.5 rounded hover:bg-red-50 transition-colors" style={{ color: '#dc2626' }}><Trash2 size={14} /></button>
-                        </div>
+                        {canManage && (
+                          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={e => { e.stopPropagation(); setModal({ type: 'service', item: s }) }} className="p-1.5 rounded hover:bg-blue-50 transition-colors" style={{ color: '#2563eb' }}><Edit2 size={14} /></button>
+                            <button onClick={e => {
+                              e.stopPropagation()
+                              if (nbArmoires > 0) { toast.error(`Supprimez d'abord les ${nbArmoires} armoire(s) de ce service.`); return }
+                              if (confirm(`Supprimer le service ${s.nom} ?`)) deleteSvc.mutate(s.id)
+                            }} className="p-1.5 rounded hover:bg-red-50 transition-colors" style={{ color: '#dc2626' }}><Trash2 size={14} /></button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                     {expandSvc === s.id && (
@@ -485,7 +535,9 @@ export default function AdminPage() {
       {/* Armoires */}
       {tab === 'armoires' && (
         <>
-          <div className="flex justify-end"><button onClick={() => setModal({ type: 'armoire' })} className="btn-primary"><Plus size={15} /> Nouvelle armoire</button></div>
+          {(currentUser?.is_principal || currentUser?.role === 'ADMIN') && (
+            <div className="flex justify-end"><button onClick={() => setModal({ type: 'armoire' })} className="btn-primary"><Plus size={15} /> Nouvelle armoire</button></div>
+          )}
           <div className="card overflow-hidden p-0">
             <table className="w-full text-sm">
               <thead style={{ background: '#f8fafc' }}><tr style={{ borderBottom: '1px solid #e2e8f0' }}>
@@ -494,6 +546,7 @@ export default function AdminPage() {
               <tbody className="divide-y" style={{ borderColor: '#f1f5f9' }}>
                 {armoires?.results?.map(a => {
                   const nbRayons = a.nombre_rayons ?? rayons.filter(r => r.armoire === a.id).length ?? 0
+                  const canManage = currentUser?.is_principal || currentUser?.role === 'ADMIN'
                   return (
                   <>
                     <tr key={a.id} className="group cursor-pointer" onClick={() => setExpandArm(expandArm === a.id ? null : a.id)}
@@ -506,14 +559,16 @@ export default function AdminPage() {
                       <td className="px-5 py-3 text-xs" style={{ color: '#64748b' }}>{a.service_code ? `${a.service_code} - ${a.service_nom}` : '—'}</td>
                       <td className="px-5 py-3 text-xs" style={{ color: '#64748b' }}>{nbRayons} rayon(s)</td>
                       <td className="px-5 py-3">
-                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={e => { e.stopPropagation(); setModal({ type: 'armoire', item: a }) }} className="p-1.5 rounded hover:bg-blue-50 transition-colors" style={{ color: '#2563eb' }}><Edit2 size={14} /></button>
-                          <button onClick={e => {
-                            e.stopPropagation()
-                            if (nbRayons > 0) { toast.error(`Supprimez d'abord les ${nbRayons} rayon(s) de cette armoire.`); return }
-                            if (confirm(`Supprimer l'armoire ${a.nom} ?`)) deleteArmoire.mutate(a.id)
-                          }} className="p-1.5 rounded hover:bg-red-50 transition-colors" style={{ color: '#dc2626' }}><Trash2 size={14} /></button>
-                        </div>
+                        {canManage && (
+                          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={e => { e.stopPropagation(); setModal({ type: 'armoire', item: a }) }} className="p-1.5 rounded hover:bg-blue-50 transition-colors" style={{ color: '#2563eb' }}><Edit2 size={14} /></button>
+                            <button onClick={e => {
+                              e.stopPropagation()
+                              if (nbRayons > 0) { toast.error(`Supprimez d'abord les ${nbRayons} rayon(s) de cette armoire.`); return }
+                              if (confirm(`Supprimer l'armoire ${a.nom} ?`)) deleteArmoire.mutate(a.id)
+                            }} className="p-1.5 rounded hover:bg-red-50 transition-colors" style={{ color: '#dc2626' }}><Trash2 size={14} /></button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                     {expandArm === a.id && (
@@ -556,14 +611,18 @@ export default function AdminPage() {
       {/* Rayons */}
       {tab === 'rayons' && (
         <>
-          <div className="flex justify-end"><button onClick={() => setModal({ type: 'rayon' })} className="btn-primary"><Plus size={15} /> Nouveau rayon</button></div>
+          {(currentUser?.is_principal || currentUser?.role === 'ADMIN') && (
+            <div className="flex justify-end"><button onClick={() => setModal({ type: 'rayon' })} className="btn-primary"><Plus size={15} /> Nouveau rayon</button></div>
+          )}
           <div className="card overflow-hidden p-0">
             <table className="w-full text-sm">
               <thead style={{ background: '#f8fafc' }}><tr style={{ borderBottom: '1px solid #e2e8f0' }}>
                 {['Code', 'Nom', 'Position', 'Armoire', 'Département', 'Service', 'Nb docs', ''].map(h => <th key={h} className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>{h}</th>)}
               </tr></thead>
               <tbody className="divide-y" style={{ borderColor: '#f1f5f9' }}>
-                {rayons.map(r => (
+                {rayons.filter(r => currentUser?.is_principal || r.departement_nom).map(r => {
+                  const canManage = currentUser?.is_principal || currentUser?.role === 'ADMIN'
+                  return (
                   <tr key={r.id} className="group"
                       onMouseOver={e => e.currentTarget.style.background = '#f8fafc'}
                       onMouseOut={e => e.currentTarget.style.background = ''}>
@@ -575,17 +634,19 @@ export default function AdminPage() {
                     <td className="px-5 py-3 text-xs" style={{ color: '#64748b' }}>{r.service_nom || '—'}</td>
                     <td className="px-5 py-3 text-xs" style={{ color: '#64748b' }}>{r.nombre_documents ?? 0}</td>
                     <td className="px-5 py-3">
-                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => setModal({ type: 'rayon', item: r })} className="p-1.5 rounded hover:bg-blue-50 transition-colors" style={{ color: '#2563eb' }}><Edit2 size={14} /></button>
-                        <button onClick={() => {
-                          const count = r.nombre_documents ?? 0
-                          if (count > 0) { toast.error(`Supprimez d'abord les ${count} document(s) de ce rayon.`); return }
-                          if (confirm(`Supprimer le rayon ${r.nom} ?`)) deleteRayon.mutate(r.id)
-                        }} className="p-1.5 rounded hover:bg-red-50 transition-colors" style={{ color: '#dc2626' }}><Trash2 size={14} /></button>
-                      </div>
+                      {canManage && (
+                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => setModal({ type: 'rayon', item: r })} className="p-1.5 rounded hover:bg-blue-50 transition-colors" style={{ color: '#2563eb' }}><Edit2 size={14} /></button>
+                          <button onClick={() => {
+                            const count = r.nombre_documents ?? 0
+                            if (count > 0) { toast.error(`Supprimez d'abord les ${count} document(s) de ce rayon.`); return }
+                            if (confirm(`Supprimer le rayon ${r.nom} ?`)) deleteRayon.mutate(r.id)
+                          }} className="p-1.5 rounded hover:bg-red-50 transition-colors" style={{ color: '#dc2626' }}><Trash2 size={14} /></button>
+                        </div>
+                      )}
                     </td>
                   </tr>
-                ))}
+                )})}
                 {!rayons.length && (
                   <tr><td colSpan={8} className="py-8 text-sm text-center" style={{ color: '#94a3b8' }}>Aucun rayon</td></tr>
                 )}

@@ -24,6 +24,13 @@ from apps.journal.utils import enregistrer_action
 from .utils import indexer_document_texte
 
 
+def _filtrer_par_departement(qs, user):
+    """Restreint le queryset au département de l'utilisateur s'il n'est pas principal."""
+    if not user.is_principal and user.departement:
+        return qs.filter(rayon__armoire__service__departement=user.departement)
+    return qs
+
+
 class DocumentListCreateView(generics.ListCreateAPIView):
     parser_classes  = [MultiPartParser, FormParser]
     filter_backends = [DjangoFilterBackend, SearchFilter]
@@ -37,10 +44,7 @@ class DocumentListCreateView(generics.ListCreateAPIView):
         qs = Document.objects.select_related(
             'rayon', 'rayon__armoire', 'createur', 'metadata'
         ).exclude(statut='SUPPRIME')
-
-        # Tous les utilisateurs authentifiés voient les documents non supprimés.
-        # Les droits d'écriture sont gérés par get_permissions() / CanAccessDocument.
-        return qs
+        return _filtrer_par_departement(qs, user)
 
     def get_serializer_class(self):
         return DocumentCreateSerializer if self.request.method == 'POST' else DocumentListSerializer
@@ -215,20 +219,20 @@ class DashboardStatsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        from apps.armoires.models import Armoire
+        from apps.armoires.models import Armoire, Rayon
+        base = Document.objects.exclude(statut='SUPPRIME')
+        base = _filtrer_par_departement(base, request.user)
         stats = {
-            'total_documents':    Document.objects.exclude(statut='SUPPRIME').count(),
-            'documents_actifs':   Document.objects.filter(statut='ACTIF').count(),
-            'documents_archives': Document.objects.filter(statut='ARCHIVE').count(),
+            'total_documents':    base.count(),
+            'documents_actifs':   base.filter(statut='ACTIF').count(),
+            'documents_archives': base.filter(statut='ARCHIVE').count(),
             'total_armoires':     Armoire.objects.count(),
             'total_rayons':       Rayon.objects.count(),
             'par_type': list(
-                Document.objects.exclude(statut='SUPPRIME')
-                .values('type_doc').annotate(count=Count('id')).order_by('-count')[:10]
+                base.values('type_doc').annotate(count=Count('id')).order_by('-count')[:10]
             ),
             'par_armoire': list(
-                Document.objects.exclude(statut='SUPPRIME')
-                .values('rayon__armoire__nom', 'rayon__armoire__code')
+                base.values('rayon__armoire__nom', 'rayon__armoire__code')
                 .annotate(count=Count('id')).order_by('-count')
             ),
         }
@@ -261,6 +265,13 @@ class DocumentExportCSVView(APIView):
                 Q(code_unique__icontains=search) |
                 Q(type_doc__icontains=search)
             )
+        debut = request.query_params.get('debut')
+        fin   = request.query_params.get('fin')
+        if debut:
+            qs = qs.filter(date_creation__gte=debut)
+        if fin:
+            qs = qs.filter(date_creation__lte=fin)
+        qs = _filtrer_par_departement(qs, request.user)
         enregistrer_action(
             auteur=request.user, type_action='CONSULTATION', document=None,
             details=f"Export CSV documents ({qs.count()} docs)",
@@ -291,6 +302,13 @@ class DocumentExportPDFView(APIView):
                 Q(code_unique__icontains=search) |
                 Q(type_doc__icontains=search)
             )
+        debut = request.query_params.get('debut')
+        fin   = request.query_params.get('fin')
+        if debut:
+            qs = qs.filter(date_creation__gte=debut)
+        if fin:
+            qs = qs.filter(date_creation__lte=fin)
+        qs = _filtrer_par_departement(qs, request.user)
         enregistrer_action(
             auteur=request.user, type_action='CONSULTATION', document=None,
             details=f"Export PDF documents ({qs.count()} docs)",
@@ -310,7 +328,9 @@ class DocumentCorbeilleListView(generics.ListAPIView):
     serializer_class = DocumentListSerializer
 
     def get_queryset(self):
-        return Document.objects.select_related('rayon', 'rayon__armoire', 'createur').filter(statut='SUPPRIME')
+        user = self.request.user
+        qs = Document.objects.select_related('rayon', 'rayon__armoire', 'createur').filter(statut='SUPPRIME')
+        return _filtrer_par_departement(qs, user)
 
 
 class DocumentRestaurerView(APIView):

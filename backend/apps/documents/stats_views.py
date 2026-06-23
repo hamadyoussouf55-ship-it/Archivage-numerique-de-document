@@ -45,6 +45,11 @@ class StatsParPeriodeView(APIView):
             date_numerisation__date__lte=fin,
         ).exclude(statut='SUPPRIME')
 
+        # Filtre par département pour les utilisateurs non-principaux
+        user = request.user
+        if not user.is_principal and user.departement:
+            qs_docs = qs_docs.filter(rayon__armoire__service__departement=user.departement)
+
         trunc_fn = {'jour': TruncDay, 'semaine': TruncWeek, 'mois': TruncMonth}.get(granularite, TruncMonth)
 
         docs_par_periode = list(

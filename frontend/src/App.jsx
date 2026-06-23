@@ -12,6 +12,7 @@ import JournalPage         from './pages/JournalPage'
 import AdminPage           from './pages/AdminPage'
 import ProfilePage         from './pages/ProfilePage'
 import StatistiquesPage    from './pages/StatistiquesPage'
+import CorbeillePage       from './pages/CorbeillePage'
 
 function Spinner() {
   return (
@@ -44,6 +45,7 @@ export default function App() {
             <Route path="documents/nouveau" element={<NouveauDocumentPage />} />
             <Route path="documents/:id"     element={<DocumentDetailPage />} />
             <Route path="statistiques"      element={<StatistiquesPage />} />
+            <Route path="corbeille"         element={<PrivateRoute adminOnly={false}><CorbeillePage /></PrivateRoute>} />
             <Route path="profil"            element={<ProfilePage />} />
             <Route path="journal"           element={<PrivateRoute adminOnly><JournalPage /></PrivateRoute>} />
             <Route path="admin"             element={<PrivateRoute adminOnly><AdminPage /></PrivateRoute>} />

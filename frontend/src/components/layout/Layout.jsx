@@ -3,13 +3,14 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import {
   LayoutDashboard, Archive, FileText, BookOpen, BarChart2,
-  Settings, LogOut, ChevronRight, Shield, User, Menu, X,
+  Settings, LogOut, ChevronRight, Shield, User, Trash2,
 } from 'lucide-react'
 
 const navItems = [
   { to: '/',             icon: LayoutDashboard, label: 'Tableau de bord',  exact: true },
   { to: '/armoires',     icon: Archive,         label: 'Armoires & Rayons' },
   { to: '/documents',    icon: FileText,        label: 'Documents' },
+  { to: '/corbeille',    icon: Trash2,          label: 'Corbeille' },
   { to: '/statistiques', icon: BarChart2,       label: 'Statistiques' },
   { to: '/journal',      icon: BookOpen,        label: 'Journal',          adminOnly: true },
   { to: '/admin',        icon: Settings,        label: 'Administration',   adminOnly: true },
@@ -53,7 +54,7 @@ export default function Layout() {
 
         {/* ── Sidebar ── */}
         <aside
-          className="flex-shrink-0 flex flex-col transition-all duration-200"
+          className="flex-shrink-0 flex flex-col transition-all duration-200 relative"
           style={{
             width: open ? 240 : 60,
             background: 'linear-gradient(180deg, #1e3a8a 0%, #1e40af 100%)',
@@ -68,21 +69,38 @@ export default function Layout() {
               SG
             </div>
             {open && (
-              <div className="overflow-hidden">
+              <div className="overflow-hidden flex-1">
                 <div className="font-bold text-white text-sm leading-tight">SYGALIN SAS</div>
                 <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 9 }}>
                   ARCHIVAGE NUMÉRIQUE
                 </div>
               </div>
             )}
-            <button
-              onClick={() => setOpen(!open)}
-              className="ml-auto flex-shrink-0"
-              style={{ color: 'rgba(255,255,255,0.5)' }}
-            >
-              {open ? <X size={14} /> : <Menu size={14} />}
-            </button>
           </div>
+
+          {/* Toggle button — outside the main flow, always visible */}
+          <button
+            onClick={() => setOpen(!open)}
+            className="absolute flex items-center justify-center rounded-full transition-all duration-200 z-10"
+            style={{
+              top: 16,
+              right: open ? 12 : -14,
+              width: 28,
+              height: 28,
+              background: '#1e3a8a',
+              color: '#93c5fd',
+              border: '2px solid rgba(255,255,255,0.2)',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+            }}
+            onMouseOver={e => e.currentTarget.style.background = '#2563eb'}
+            onMouseOut={e  => e.currentTarget.style.background = '#1e3a8a'}
+          >
+            <ChevronRight
+              size={14}
+              className="transition-transform duration-200"
+              style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}
+            />
+          </button>
 
           {/* Nav */}
           <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">

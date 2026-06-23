@@ -12,6 +12,13 @@ class ArmoireListCreateView(generics.ListCreateAPIView):
     filterset_fields = ['service', 'service__departement']
     search_fields   = ['nom', 'code']
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        if not user.is_principal and user.departement:
+            qs = qs.filter(service__departement=user.departement)
+        return qs
+
     def get_serializer_class(self):
         return ArmoireListSerializer if self.request.method == 'GET' else ArmoireSerializer
 
@@ -22,6 +29,13 @@ class ArmoireListCreateView(generics.ListCreateAPIView):
 class ArmoireDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset         = Armoire.objects.select_related('service', 'service__departement').prefetch_related('rayons').all()
     serializer_class = ArmoireSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        if not user.is_principal and user.departement:
+            qs = qs.filter(service__departement=user.departement)
+        return qs
 
     def get_permissions(self):
         return [permissions.IsAuthenticated()] if self.request.method == 'GET' else [IsAdmin()]
@@ -58,6 +72,13 @@ class RayonListCreateView(generics.ListCreateAPIView):
     filterset_fields = ['armoire', 'armoire__service', 'armoire__service__departement']
     search_fields    = ['nom', 'code']
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        if not user.is_principal and user.departement:
+            qs = qs.filter(armoire__service__departement=user.departement)
+        return qs
+
     def get_permissions(self):
         return [IsAdminOrArchiviste()] if self.request.method == 'POST' else [permissions.IsAuthenticated()]
 
@@ -65,6 +86,13 @@ class RayonListCreateView(generics.ListCreateAPIView):
 class RayonDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset         = Rayon.objects.select_related('armoire', 'armoire__service', 'armoire__service__departement').all()
     serializer_class = RayonSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        if not user.is_principal and user.departement:
+            qs = qs.filter(armoire__service__departement=user.departement)
+        return qs
 
     def get_permissions(self):
         return [permissions.IsAuthenticated()] if self.request.method == 'GET' else [IsAdminOrArchiviste()]
